@@ -8,7 +8,7 @@ import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { InjectRepository } from '@nestjs/typeorm';
 import * as bcrypt from 'bcryptjs';
-import { randomInt } from 'crypto';
+import { createHash, randomInt, randomUUID } from 'crypto';
 import { MoreThan, Repository } from 'typeorm';
 import { EventPublisherService } from '../events/event-publisher.service';
 import { LoginDto } from './dto/login.dto';
@@ -51,9 +51,29 @@ export class AuthService {
   ) {}
 
 
+  private normalizeEmail(email: string): string {
+    return email.trim().toLowerCase();
+  }
+
+  /** Busca por correo sin distinguir mayúsculas (incluye filas antiguas guardadas con mayúsculas). */
+  private findUserByEmail(email: string): Promise<UsuarioAuth | null> {
+    return this.usuarios
+      .createQueryBuilder('u')
+      .where('LOWER(u.email) = :email', { email: this.normalizeEmail(email) })
+      .getOne();
+  }
+
+  /**
+   * Los refresh tokens son JWT largos y aleatorios: se guardan como SHA-256.
+   * bcrypt no sirve aquí porque solo usa los primeros 72 bytes, que en un JWT
+   * son casi idénticos para todos los tokens de un mismo usuario.
+   */
+  private hashRefreshToken(token: string): string {
+    return createHash('sha256').update(token).digest('hex');
+  }
+
   async checkEmailAvailability(email: string) {
-    const normalized = email.trim().toLowerCase();
-    const existing = await this.usuarios.findOne({ where: { email: normalized } });
+    const existing = await this.findUserByEmail(email);
     if (existing) {
       return { available: false, message: 'Correo eletronico registrado en otra cuenta' };
     }
@@ -80,6 +100,7 @@ export class AuthService {
   }
 
   async verifyPhoneVerification(idUser: string, phone: string, firebaseIdToken: string) {
+    phone = phone.trim();
     const result = await this.firebaseService.verifyPhoneToken(idUser, phone, firebaseIdToken);
     let row = await this.phones.findOne({ where: { idUser } });
     if (!row) row = this.phones.create({ idUser, phone, firebaseUid: result.firebaseUid, verified: true });
@@ -92,7 +113,7 @@ export class AuthService {
       }
       throw error;
     }
-    await this.kycClient.updateVerifiedContact(idUser, { telefono: phone.trim() });
+    await this.kycClient.updateVerifiedContact(idUser, { telefono: phone });
     return { verified: true, phone };
   }
 
@@ -135,8 +156,8 @@ export class AuthService {
   }
 
   async requestPasswordReset(email: string, channel: 'email' | 'whatsapp') {
-    const normalizedEmail = email.trim().toLowerCase();
-    const user = await this.usuarios.findOne({ where: { email: normalizedEmail } });
+    const normalizedEmail = this.normalizeEmail(email);
+    const user = await this.findUserByEmail(normalizedEmail);
     if (!user) return { accepted: true, expiresInSeconds: PASSWORD_RESET_TTL_SECONDS };
 
     const now = new Date();
@@ -197,7 +218,7 @@ export class AuthService {
       throw new BadRequestException('Esta clave es insegura. Elige un PIN de 4 dígitos diferente.');
     }
 
-    const user = await this.usuarios.findOne({ where: { email: email.trim().toLowerCase() } });
+    const user = await this.findUserByEmail(email);
     if (!user) throw new BadRequestException('Código inválido o vencido. Solicita uno nuevo.');
 
     const challenge = await this.passwordResetChallenges.findOne({ where: { idUser: user.idUser } });
@@ -255,13 +276,14 @@ export class AuthService {
 
   /** Crea las credenciales (clave hasheada con bcrypt). Exige identidad, correo y teléfono verificados. */
   async register(dto: RegisterDto) {
+    const email = this.normalizeEmail(dto.email);
     if (!this.isSecureRegistrationPassword(dto.password)) {
       throw new BadRequestException('Esta clave es insegura');
     }
 
     // El servidor no confía en el frontend: solo se crean credenciales para un
     // idUser cuya identidad (KYC), correo y teléfono ya fueron verificados.
-    const correoVerificado = await this.emailService.isVerified(dto.idUser, dto.email);
+    const correoVerificado = await this.emailService.isVerified(dto.idUser, email);
     if (!correoVerificado) {
       throw new BadRequestException('Debes verificar tu correo antes de crear la cuenta.');
     }
@@ -278,10 +300,14 @@ export class AuthService {
       throw new BadRequestException('Debes verificar tu identidad antes de crear la cuenta.');
     }
 
+    if (await this.findUserByEmail(email)) {
+      throw new ConflictException('Ya existe una cuenta con esos datos.');
+    }
+
     const passwordHash = await bcrypt.hash(dto.password, 12);
     const usuario = this.usuarios.create({
       idUser: dto.idUser,
-      email: dto.email,
+      email,
       passwordHash,
       mfaSecret: null,
       mfaEnabled: false,
@@ -312,7 +338,7 @@ export class AuthService {
 
   /** POST /auth/login — valida credenciales y entrega el access token directamente. */
   async login(dto: LoginDto) {
-    const usuario = await this.usuarios.findOne({ where: { email: dto.email } });
+    const usuario = await this.findUserByEmail(dto.email);
 
     if (!usuario) {
       throw new UnauthorizedException('Credenciales inválidas');
@@ -357,13 +383,14 @@ export class AuthService {
     // Sesión activa (11.1 Autenticación y Sesión). Ya no hay segundo factor por app TOTP:
     // la cuenta se protege con la verificación de identidad, correo y teléfono del registro.
     const refreshTokenPlano = this.jwt.sign(
-      { sub: usuario.idUser, type: 'refresh' },
+      // jti hace único cada refresh token aunque se emitan dos en el mismo segundo.
+      { sub: usuario.idUser, type: 'refresh', jti: randomUUID() },
       {
         secret: this.config.get('JWT_SECRET'),
         expiresIn: this.config.get('JWT_REFRESH_EXPIRES_IN', '7d'),
       },
     );
-    const refreshTokenHash = await bcrypt.hash(refreshTokenPlano, 10);
+    const refreshTokenHash = this.hashRefreshToken(refreshTokenPlano);
 
     const expiresAt = new Date();
     expiresAt.setDate(expiresAt.getDate() + REFRESH_TOKEN_DAYS);
@@ -406,17 +433,14 @@ export class AuthService {
       throw new UnauthorizedException('Token no es de tipo refresh');
     }
 
-    const sesiones = await this.sesiones.find({
-      where: { idUser: payload.sub, activa: true, expiresAt: MoreThan(new Date()) },
+    const sesionValida = await this.sesiones.findOne({
+      where: {
+        idUser: payload.sub,
+        refreshTokenHash: this.hashRefreshToken(dto.refreshToken),
+        activa: true,
+        expiresAt: MoreThan(new Date()),
+      },
     });
-
-    let sesionValida: SesionActiva | null = null;
-    for (const s of sesiones) {
-      if (await bcrypt.compare(dto.refreshToken, s.refreshTokenHash)) {
-        sesionValida = s;
-        break;
-      }
-    }
 
     if (!sesionValida || !sesionValida.mfaVerified) {
       throw new UnauthorizedException('Sesión revocada, expirada o sin MFA verificado');

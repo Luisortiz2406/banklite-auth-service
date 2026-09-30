@@ -3,10 +3,8 @@ import {
   CreateDateColumn,
   Entity,
   Index,
-  ManyToOne,
   PrimaryGeneratedColumn,
 } from 'typeorm';
-import { UsuarioAuth } from './usuario-auth.entity';
 
 /**
  * Tabla sesiones_activas
@@ -18,14 +16,11 @@ export class SesionActiva {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @ManyToOne(() => UsuarioAuth, { onDelete: 'CASCADE' })
-  usuario: UsuarioAuth;
-
   @Index()
   @Column({ name: 'id_user', type: 'uuid' })
   idUser: string;
 
-  // Nunca se almacena el refresh token en claro, solo su hash.
+  // Nunca se almacena el refresh token en claro, solo su hash SHA-256.
   @Index({ unique: true })
   @Column({ name: 'refresh_token_hash' })
   refreshTokenHash: string;
