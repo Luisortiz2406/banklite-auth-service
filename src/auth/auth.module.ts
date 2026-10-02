@@ -11,7 +11,6 @@ import { EmailVerification } from './entities/email-verification.entity';
 import { PhoneVerification } from './entities/phone-verification.entity';
 import { PasswordResetChallenge } from './entities/password-reset-challenge.entity';
 import { EmailService } from './email.service';
-import { FirebaseService } from './firebase.service';
 import { KycClientService } from './kyc-client.service';
 import { WhatsappOtpClientService } from './whatsapp-otp-client.service';
 
@@ -26,7 +25,6 @@ import { WhatsappOtpClientService } from './whatsapp-otp-client.service';
     AuthService,
     EventPublisherService,
     EmailService,
-    FirebaseService,
     KycClientService,
     WhatsappOtpClientService,
   ],

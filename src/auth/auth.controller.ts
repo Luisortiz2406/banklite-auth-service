@@ -7,7 +7,6 @@ import { IsEmail, IsIn, IsOptional, IsString, IsUUID, Matches, MinLength } from 
 
 class EmailSendDto { @IsUUID() idUser: string; @IsEmail() email: string; }
 class EmailVerifyDto { @IsUUID() idUser: string; @IsEmail() email: string; @Matches(/^\d{6}$/) code: string; }
-class PhoneVerifyDto { @IsUUID() idUser: string; @IsString() phone: string; @MinLength(20) firebaseIdToken: string; }
 class WhatsappOtpSendDto {
   @IsUUID() idUser: string;
   @Matches(/^\+[1-9]\d{7,14}$/, { message: 'phone debe estar en formato internacional E.164' })
@@ -68,12 +67,6 @@ export class AuthController {
   checkPhone(@Body() dto: ContactCheckDto) {
     if (!dto.phone) return { available: true };
     return this.authService.checkPhoneAvailability(dto.phone);
-  }
-
-  @Post('phone/verify')
-  @HttpCode(HttpStatus.OK)
-  verifyPhone(@Body() dto: PhoneVerifyDto) {
-    return this.authService.verifyPhoneVerification(dto.idUser, dto.phone, dto.firebaseIdToken);
   }
 
   @Post('whatsapp/send')

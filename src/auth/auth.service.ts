@@ -17,7 +17,6 @@ import { RegisterDto } from './dto/register.dto';
 import { SesionActiva } from './entities/sesion-activa.entity';
 import { UsuarioAuth } from './entities/usuario-auth.entity';
 import { EmailService } from './email.service';
-import { FirebaseService } from './firebase.service';
 import { KycClientService } from './kyc-client.service';
 import { PhoneVerification } from './entities/phone-verification.entity';
 import { PasswordResetChallenge } from './entities/password-reset-challenge.entity';
@@ -41,7 +40,6 @@ export class AuthService {
     private readonly config: ConfigService,
     private readonly events: EventPublisherService,
     private readonly emailService: EmailService,
-    private readonly firebaseService: FirebaseService,
     private readonly kycClient: KycClientService,
     private readonly whatsappOtp: WhatsappOtpClientService,
     @InjectRepository(PhoneVerification)
@@ -97,24 +95,6 @@ export class AuthService {
     const result = await this.emailService.verifyCode(idUser, email, code);
     await this.kycClient.updateVerifiedContact(idUser, { email: email.trim().toLowerCase() });
     return result;
-  }
-
-  async verifyPhoneVerification(idUser: string, phone: string, firebaseIdToken: string) {
-    phone = phone.trim();
-    const result = await this.firebaseService.verifyPhoneToken(idUser, phone, firebaseIdToken);
-    let row = await this.phones.findOne({ where: { idUser } });
-    if (!row) row = this.phones.create({ idUser, phone, firebaseUid: result.firebaseUid, verified: true });
-    else Object.assign(row, { phone, firebaseUid: result.firebaseUid, verified: true });
-    try {
-      await this.phones.save(row);
-    } catch (error) {
-      if ((error as any)?.code === '23505') {
-        throw new ConflictException('Numero de telefono registrado en otra cuenta ');
-      }
-      throw error;
-    }
-    await this.kycClient.updateVerifiedContact(idUser, { telefono: phone });
-    return { verified: true, phone };
   }
 
   async sendWhatsappVerification(idUser: string, phone: string) {
