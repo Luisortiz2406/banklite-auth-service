@@ -58,6 +58,15 @@ export class UsuarioAuth {
   @Column({ name: 'blocked_until', type: 'timestamptz', nullable: true })
   blockedUntil: Date | null;
 
+  // Recuperación de clave: intentos fallidos (dato que no es de la cuenta o
+  // código equivocado). Al llegar al máximo se bloquea el cambio de clave hasta
+  // que la persona vuelva a iniciar sesión.
+  @Column({ name: 'recovery_failed_attempts', default: 0 })
+  recoveryFailedAttempts: number;
+
+  @Column({ name: 'recovery_blocked', default: false })
+  recoveryBlocked: boolean;
+
   // Suspensión manual desde el panel administrativo (distinta del bloqueo
   // temporal por intentos fallidos): solo un empleado la puede levantar.
   @Column({ name: 'disabled_by_bank', default: false })

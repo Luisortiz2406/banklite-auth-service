@@ -117,6 +117,43 @@ export class EmailService {
     };
   }
 
+  /** Alerta de seguridad: se bloqueó el cambio de clave por intentos fallidos. */
+  async sendRecoveryBlockedAlert(email: string, name: string, attempts: number) {
+    const safeName = name.replace(/[<>&"]/g, '');
+    const subject = '⚠️ [Acción requerida] Intentos de cambio de clave excedidos';
+    const text = [
+      `Hola, ${safeName}:`,
+      '',
+      `Hemos detectado ${attempts} intentos fallidos para cambiar la clave de tu cuenta BankLite. Como medida de seguridad, bloqueamos el cambio de clave. Se desbloquea automáticamente cuando ingreses con tu usuario y tu clave.`,
+      '',
+      '⚠️ ¿NO FUISTE TÚ?',
+      'Si no has intentado cambiar tu clave, no te preocupes: tu cuenta sigue protegida y tu clave no cambió. Puedes ignorar este correo o contactar a nuestro equipo de soporte en ayuda@banklite.co si notas alguna actividad sospechosa.',
+      '',
+      'Atentamente,',
+      'El equipo de seguridad de BankLite',
+      '',
+      'Este es un correo automático enviado por seguridad, por favor no respondas a este mensaje.',
+    ].join('\n');
+    const html = `<div style="font-family:Arial,sans-serif;color:#202824;max-width:560px;margin:0 auto;padding:24px">
+      <h2 style="color:#18794e;margin:0 0 16px">BankLite</h2>
+      <p>Hola, <b>${safeName}</b>:</p>
+      <p>Hemos detectado <b>${attempts} intentos fallidos</b> para cambiar la clave de tu cuenta. Como medida de seguridad, <b>bloqueamos el cambio de clave</b>. Se desbloquea automáticamente cuando ingreses con tu usuario y tu clave.</p>
+      <div style="background:#fff4e5;border-left:4px solid #e07b00;padding:12px 16px;margin:20px 0;border-radius:6px">
+        <p style="margin:0 0 6px;font-weight:700">⚠️ ¿NO FUISTE TÚ?</p>
+        <p style="margin:0">Si no has intentado cambiar tu clave, no te preocupes: tu cuenta sigue protegida y tu clave no cambió. Puedes ignorar este correo o contactar a nuestro equipo de soporte en <a href="mailto:ayuda@banklite.co">ayuda@banklite.co</a> si notas alguna actividad sospechosa.</p>
+      </div>
+      <p>Atentamente,<br>El equipo de seguridad de BankLite</p>
+      <p style="color:#6b7a75;font-size:12px;margin-top:24px">Este es un correo automático enviado por seguridad, por favor no respondas a este mensaje.</p>
+    </div>`;
+    await this.getTransporter().sendMail({
+      from: this.config.get<string>('GMAIL_SMTP_USER'),
+      to: email,
+      subject,
+      text,
+      html,
+    });
+  }
+
   async sendPasswordResetCode(email: string, code: string) {
     await this.validateEmailDomain(email);
     try {

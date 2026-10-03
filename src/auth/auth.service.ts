@@ -4,6 +4,7 @@ import {
   ConflictException,
   UnauthorizedException,
   ForbiddenException,
+  Logger,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
@@ -29,10 +30,15 @@ const DURACION_BLOQUEO_MS = 30 * 60 * 1000;
 const PASSWORD_RESET_TTL_SECONDS = 5 * 60;
 const PASSWORD_RESET_RESEND_SECONDS = 60;
 const PASSWORD_RESET_MAX_ATTEMPTS = 5;
+// Intentos fallidos de recuperación (dato ajeno o código malo) antes de bloquearla.
+const MAX_RECOVERY_FAILURES = 3;
+const RECOVERY_BLOCKED_MESSAGE = 'Excediste tus intentos, tu cambio de clave fue bloqueado. Se desbloquea cuando inicies sesión.';
 const REFRESH_TOKEN_DAYS = 7;
 
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name);
+
   constructor(
     @InjectRepository(UsuarioAuth)
     private readonly usuarios: Repository<UsuarioAuth>,
@@ -156,12 +162,43 @@ export class AuthService {
       );
     }
     if (target.username) return this.findAccountMatchingContact(target, channel);
-    if (target.email) return this.findUserByEmail(target.email);
-    if (channel === 'whatsapp' && target.phone) {
+    let user: UsuarioAuth | null = null;
+    if (target.email) user = await this.findUserByEmail(target.email);
+    else if (channel === 'whatsapp' && target.phone) {
       const verified = await this.phones.findOne({ where: { phone: target.phone.trim(), verified: true } });
-      return verified ? this.usuarios.findOne({ where: { idUser: verified.idUser } }) : null;
+      user = verified ? await this.usuarios.findOne({ where: { idUser: verified.idUser } }) : null;
     }
-    return null;
+    if (user?.recoveryBlocked) throw new ForbiddenException(RECOVERY_BLOCKED_MESSAGE);
+    return user;
+  }
+
+  /**
+   * Suma un intento fallido de recuperación. Al llegar al máximo bloquea el
+   * cambio de clave (hasta el próximo inicio de sesión) y avisa por correo.
+   * Devuelve true si la cuenta quedó bloqueada.
+   */
+  private async registerRecoveryFailure(user: UsuarioAuth): Promise<boolean> {
+    user.recoveryFailedAttempts += 1;
+    const blocked = user.recoveryFailedAttempts >= MAX_RECOVERY_FAILURES;
+    if (blocked) user.recoveryBlocked = true;
+    await this.usuarios.save(user);
+    if (blocked) {
+      await this.passwordResetChallenges.delete({ idUser: user.idUser });
+      void this.sendRecoveryBlockedAlert(user);
+    }
+    return blocked;
+  }
+
+  private async sendRecoveryBlockedAlert(user: UsuarioAuth) {
+    let name = user.username || 'cliente';
+    try {
+      name = (await this.kycClient.getIdentityStatus(user.idUser)).nombreCompleto || name;
+    } catch { /* sin nombre de KYC se usa el usuario */ }
+    try {
+      await this.emailService.sendRecoveryBlockedAlert(user.email, name, user.recoveryFailedAttempts);
+    } catch (error) {
+      this.logger.warn(`No se pudo enviar la alerta de bloqueo de recuperación: ${(error as Error).message}`);
+    }
   }
 
   /** El dato escrito debe ser el registrado en la cuenta del usuario indicado. */
@@ -170,19 +207,25 @@ export class AuthService {
     channel: 'email' | 'whatsapp',
   ): Promise<UsuarioAuth> {
     const account = await this.usuarios.findOne({ where: { username: target.username!.trim().toLowerCase() } });
+    if (account?.recoveryBlocked) throw new ForbiddenException(RECOVERY_BLOCKED_MESSAGE);
 
+    let matches: boolean;
+    let mismatchMessage: string;
     if (channel === 'whatsapp' && target.phone) {
       const verified = account
         ? await this.phones.findOne({ where: { idUser: account.idUser, verified: true } })
         : null;
-      if (!account || !verified || verified.phone !== target.phone.trim()) {
-        throw new BadRequestException('Este número no pertenece a tu cuenta.');
-      }
-      return account;
+      matches = !!verified && verified.phone === target.phone.trim();
+      mismatchMessage = 'Este número no pertenece a tu cuenta.';
+    } else {
+      matches = !!account && this.normalizeEmail(account.email) === this.normalizeEmail(target.email!);
+      mismatchMessage = 'Este correo no pertenece a tu cuenta.';
     }
 
-    if (!account || this.normalizeEmail(account.email) !== this.normalizeEmail(target.email!)) {
-      throw new BadRequestException('Este correo no pertenece a tu cuenta.');
+    if (!account) throw new BadRequestException(mismatchMessage);
+    if (!matches) {
+      if (await this.registerRecoveryFailure(account)) throw new ForbiddenException(RECOVERY_BLOCKED_MESSAGE);
+      throw new BadRequestException(mismatchMessage);
     }
     return account;
   }
@@ -279,6 +322,7 @@ export class AuthService {
 
     if (!validCode) {
       await this.passwordResetChallenges.save(challenge);
+      if (await this.registerRecoveryFailure(user)) throw new ForbiddenException(RECOVERY_BLOCKED_MESSAGE);
       throw new BadRequestException('Código incorrecto o vencido.');
     }
 
@@ -286,6 +330,7 @@ export class AuthService {
     user.passwordHash = hashed.hash;
     user.passwordHashVersion = hashed.version;
     user.failedLoginAttempts = 0;
+    user.recoveryFailedAttempts = 0;
     user.status = 'active';
     user.blockedUntil = null;
     await this.usuarios.save(user);
@@ -445,9 +490,12 @@ export class AuthService {
       throw new ForbiddenException('Tu acceso fue suspendido por el banco. Comunícate con soporte.');
     }
 
-    // Login correcto: resetea contador de intentos fallidos.
+    // Login correcto: resetea contador de intentos fallidos y desbloquea el
+    // cambio de clave si se había bloqueado por intentos de recuperación.
     usuario.failedLoginAttempts = 0;
     usuario.blockedUntil = null;
+    usuario.recoveryFailedAttempts = 0;
+    usuario.recoveryBlocked = false;
     await this.usuarios.save(usuario);
 
     // Sesión activa (11.1 Autenticación y Sesión). Ya no hay segundo factor por app TOTP:
