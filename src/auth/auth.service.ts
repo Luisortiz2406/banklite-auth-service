@@ -295,7 +295,15 @@ export class AuthService {
       blockedUntil: null,
     });
     try {
-      await this.usuarios.save(usuario);
+      // Credenciales y evento en la misma transacción (outbox transaccional).
+      await this.usuarios.manager.transaction(async (manager) => {
+        await manager.save(usuario);
+        await this.events.publish('account.created', {
+          idUser: usuario.idUser,
+          email: usuario.email,
+          nombreCompleto: identity.nombreCompleto,
+        }, manager);
+      });
     } catch (error) {
       // PostgreSQL unique violation: idUser o correo ya tienen credenciales.
       if ((error as any)?.code === '23505') {
@@ -303,12 +311,7 @@ export class AuthService {
       }
       throw error;
     }
-
-    await this.events.publish('account.created', {
-      idUser: usuario.idUser,
-      email: usuario.email,
-      nombreCompleto: identity.nombreCompleto,
-    });
+    void this.events.flush();
 
     return {
       idUser: usuario.idUser,
@@ -343,14 +346,16 @@ export class AuthService {
         usuario.status = 'blocked';
         usuario.blockedUntil = new Date(Date.now() + DURACION_BLOQUEO_MS);
       }
-      await this.usuarios.save(usuario);
-
-      await this.events.publish('intento_fallido_login', {
-        idUser: usuario.idUser,
-        email: usuario.email,
-        intentos: usuario.failedLoginAttempts,
-        fechaHora: new Date().toISOString(),
+      await this.usuarios.manager.transaction(async (manager) => {
+        await manager.save(usuario);
+        await this.events.publish('intento_fallido_login', {
+          idUser: usuario.idUser,
+          email: usuario.email,
+          intentos: usuario.failedLoginAttempts,
+          fechaHora: new Date().toISOString(),
+        }, manager);
       });
+      void this.events.flush();
 
       throw new UnauthorizedException('Credenciales inválidas');
     }
@@ -382,13 +387,15 @@ export class AuthService {
       activa: true,
       expiresAt,
     });
-    await this.sesiones.save(sesion);
-
-    await this.events.publish('usuario_autenticado', {
-      idUser: usuario.idUser,
-      email: usuario.email,
-      sessionId: sesion.id,
+    await this.sesiones.manager.transaction(async (manager) => {
+      await manager.save(sesion);
+      await this.events.publish('usuario_autenticado', {
+        idUser: usuario.idUser,
+        email: usuario.email,
+        sessionId: sesion.id,
+      }, manager);
     });
+    void this.events.flush();
 
     const accessToken = this.issueAccessToken(usuario.idUser);
     return {
