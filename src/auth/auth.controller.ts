@@ -21,12 +21,19 @@ class WhatsappOtpVerifyDto {
 }
 // Cada endpoint (/email/check, /phone/check) envía solo uno de los dos campos.
 class ContactCheckDto { @IsOptional() @IsString() email?: string; @IsOptional() @IsString() phone?: string; }
+// La cuenta se identifica con el correo o, por WhatsApp, con el celular verificado.
 class PasswordResetRequestDto {
-  @IsEmail() email: string;
+  @IsOptional() @IsEmail() email?: string;
+  @IsOptional()
+  @Matches(/^\+[1-9]\d{7,14}$/, { message: 'phone debe estar en formato internacional E.164' })
+  phone?: string;
   @IsIn(['email', 'whatsapp']) channel: 'email' | 'whatsapp';
 }
 class PasswordResetDto {
-  @IsEmail() email: string;
+  @IsOptional() @IsEmail() email?: string;
+  @IsOptional()
+  @Matches(/^\+[1-9]\d{7,14}$/, { message: 'phone debe estar en formato internacional E.164' })
+  phone?: string;
   @IsIn(['email', 'whatsapp']) channel: 'email' | 'whatsapp';
   @Matches(/^\d{6}$/, { message: 'El código debe tener 6 dígitos.' }) code: string;
   @IsString() @MinLength(8) password: string;
@@ -102,13 +109,13 @@ export class AuthController {
   @Post('password-recovery/send')
   @HttpCode(HttpStatus.OK)
   requestPasswordReset(@Body() dto: PasswordResetRequestDto) {
-    return this.authService.requestPasswordReset(dto.email, dto.channel);
+    return this.authService.requestPasswordReset({ email: dto.email, phone: dto.phone }, dto.channel);
   }
 
   @Post('password-recovery/reset')
   @HttpCode(HttpStatus.OK)
   resetPassword(@Body() dto: PasswordResetDto) {
-    return this.authService.resetPassword(dto.email, dto.channel, dto.code, dto.password);
+    return this.authService.resetPassword({ email: dto.email, phone: dto.phone }, dto.channel, dto.code, dto.password);
   }
 
   @Post('refresh-token')

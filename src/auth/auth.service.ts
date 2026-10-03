@@ -138,10 +138,29 @@ export class AuthService {
     };
   }
 
-  async requestPasswordReset(email: string, channel: 'email' | 'whatsapp') {
-    const normalizedEmail = this.normalizeEmail(email);
-    const user = await this.findUserByEmail(normalizedEmail);
+  /**
+   * Cuenta a la que se le recupera la clave: por correo, o por el celular
+   * verificado cuando el canal es WhatsApp. El correo sigue sirviendo en ambos
+   * canales (lo usa el cambio de clave del dashboard).
+   */
+  private async findUserForRecovery(
+    target: { email?: string; phone?: string },
+    channel: 'email' | 'whatsapp',
+  ): Promise<UsuarioAuth | null> {
+    if (target.email) return this.findUserByEmail(target.email);
+    if (channel === 'whatsapp' && target.phone) {
+      const verified = await this.phones.findOne({ where: { phone: target.phone.trim(), verified: true } });
+      return verified ? this.usuarios.findOne({ where: { idUser: verified.idUser } }) : null;
+    }
+    throw new BadRequestException(
+      channel === 'email' ? 'Escribe tu correo registrado.' : 'Escribe tu número de celular registrado.',
+    );
+  }
+
+  async requestPasswordReset(target: { email?: string; phone?: string }, channel: 'email' | 'whatsapp') {
+    const user = await this.findUserForRecovery(target, channel);
     if (!user) return { accepted: true, expiresInSeconds: PASSWORD_RESET_TTL_SECONDS };
+    const normalizedEmail = this.normalizeEmail(user.email);
 
     const now = new Date();
     const existing = await this.passwordResetChallenges.findOne({ where: { idUser: user.idUser } });
@@ -192,7 +211,7 @@ export class AuthService {
   }
 
   async resetPassword(
-    email: string,
+    target: { email?: string; phone?: string },
     channel: 'email' | 'whatsapp',
     code: string,
     password: string,
@@ -201,7 +220,7 @@ export class AuthService {
       throw new BadRequestException('Esta clave es insegura. Elige un PIN de 4 dígitos diferente.');
     }
 
-    const user = await this.findUserByEmail(email);
+    const user = await this.findUserForRecovery(target, channel);
     if (!user) throw new BadRequestException('Código inválido o vencido. Solicita uno nuevo.');
 
     const challenge = await this.passwordResetChallenges.findOne({ where: { idUser: user.idUser } });
