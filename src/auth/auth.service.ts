@@ -142,22 +142,52 @@ export class AuthService {
    * Cuenta a la que se le recupera la clave: por correo, o por el celular
    * verificado cuando el canal es WhatsApp. El correo sigue sirviendo en ambos
    * canales (lo usa el cambio de clave del dashboard).
+   *
+   * Con username (pantalla de ingreso), el correo o el celular deben ser
+   * exactamente los registrados en esa cuenta; si no, se rechaza.
    */
   private async findUserForRecovery(
-    target: { email?: string; phone?: string },
+    target: { username?: string; email?: string; phone?: string },
     channel: 'email' | 'whatsapp',
   ): Promise<UsuarioAuth | null> {
+    if (!target.email && !(channel === 'whatsapp' && target.phone)) {
+      throw new BadRequestException(
+        channel === 'email' ? 'Escribe tu correo registrado.' : 'Escribe tu número de celular registrado.',
+      );
+    }
+    if (target.username) return this.findAccountMatchingContact(target, channel);
     if (target.email) return this.findUserByEmail(target.email);
     if (channel === 'whatsapp' && target.phone) {
       const verified = await this.phones.findOne({ where: { phone: target.phone.trim(), verified: true } });
       return verified ? this.usuarios.findOne({ where: { idUser: verified.idUser } }) : null;
     }
-    throw new BadRequestException(
-      channel === 'email' ? 'Escribe tu correo registrado.' : 'Escribe tu número de celular registrado.',
-    );
+    return null;
   }
 
-  async requestPasswordReset(target: { email?: string; phone?: string }, channel: 'email' | 'whatsapp') {
+  /** El dato escrito debe ser el registrado en la cuenta del usuario indicado. */
+  private async findAccountMatchingContact(
+    target: { username?: string; email?: string; phone?: string },
+    channel: 'email' | 'whatsapp',
+  ): Promise<UsuarioAuth> {
+    const account = await this.usuarios.findOne({ where: { username: target.username!.trim().toLowerCase() } });
+
+    if (channel === 'whatsapp' && target.phone) {
+      const verified = account
+        ? await this.phones.findOne({ where: { idUser: account.idUser, verified: true } })
+        : null;
+      if (!account || !verified || verified.phone !== target.phone.trim()) {
+        throw new BadRequestException('Este número no pertenece a tu cuenta.');
+      }
+      return account;
+    }
+
+    if (!account || this.normalizeEmail(account.email) !== this.normalizeEmail(target.email!)) {
+      throw new BadRequestException('Este correo no pertenece a tu cuenta.');
+    }
+    return account;
+  }
+
+  async requestPasswordReset(target: { username?: string; email?: string; phone?: string }, channel: 'email' | 'whatsapp') {
     const user = await this.findUserForRecovery(target, channel);
     if (!user) return { accepted: true, expiresInSeconds: PASSWORD_RESET_TTL_SECONDS };
     const normalizedEmail = this.normalizeEmail(user.email);
@@ -211,7 +241,7 @@ export class AuthService {
   }
 
   async resetPassword(
-    target: { email?: string; phone?: string },
+    target: { username?: string; email?: string; phone?: string },
     channel: 'email' | 'whatsapp',
     code: string,
     password: string,
