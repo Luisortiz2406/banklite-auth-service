@@ -11,9 +11,11 @@ import { UsuarioAuth } from './entities/usuario-auth.entity';
  * un secreto por usuario derivado de DYNAMIC_KEY_SECRET (o JWT_SECRET), así
  * que no se guarda ningún secreto en la base.
  *
- * - Cada código sirve una sola vez (se recuerda el último paso usado).
- * - Se acepta también el código del minuto anterior por si cambió mientras
- *   la persona lo escribía.
+ * - Transferencias dentro de Banklite: la app envía sola el código vigente y
+ *   transfer-service lo valida aquí; la persona no lo escribe.
+ * - Compras online en tiendas externas: ahí sí se escribe a mano.
+ * - Un código vale durante su minuto (sirve para varias operaciones) y se
+ *   acepta también el del minuto anterior por si cambió en el camino.
  * - 5 códigos incorrectos seguidos bloquean la clave dinámica 15 minutos.
  */
 export const DYNAMIC_KEY_PERIOD_SECONDS = 60;
@@ -51,10 +53,7 @@ export class DynamicKeyService {
     }
 
     const current = this.stepAt(Date.now());
-    const lastUsed = user.dynamicKeyLastStep !== null ? Number(user.dynamicKeyLastStep) : -1;
-    const matched = [current, current - 1].find(
-      (step) => step > lastUsed && this.safeEqual(code, this.codeFor(idUser, step)),
-    );
+    const matched = [current, current - 1].find((step) => this.safeEqual(code, this.codeFor(idUser, step)));
 
     if (matched === undefined) {
       user.dynamicKeyFailures += 1;
@@ -68,7 +67,6 @@ export class DynamicKeyService {
       return { valid: false, message: 'Clave dinámica incorrecta o vencida.' };
     }
 
-    user.dynamicKeyLastStep = String(matched);
     user.dynamicKeyFailures = 0;
     user.dynamicKeyLockedUntil = null;
     await this.usuarios.save(user);

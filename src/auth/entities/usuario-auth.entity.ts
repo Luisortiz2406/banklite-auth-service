@@ -67,11 +67,7 @@ export class UsuarioAuth {
   @Column({ name: 'recovery_blocked', default: false })
   recoveryBlocked: boolean;
 
-  // Clave dinámica (ver DynamicKeyService): último paso de 60 s ya usado
-  // (cada código sirve una vez), fallos seguidos y bloqueo temporal.
-  @Column({ name: 'dynamic_key_last_step', type: 'bigint', nullable: true })
-  dynamicKeyLastStep: string | null;
-
+  // Clave dinámica (ver DynamicKeyService): fallos seguidos y bloqueo temporal.
   @Column({ name: 'dynamic_key_failures', default: 0 })
   dynamicKeyFailures: number;
 
