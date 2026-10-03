@@ -1,5 +1,6 @@
 import { Injectable, ServiceUnavailableException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { fetchWithRetry } from '../common/http/fetch-with-retry';
 
 /**
  * Cliente HTTP interno hacia KYC Service. Auth Service no toca la base de KYC
@@ -20,12 +21,9 @@ export class KycClientService {
       );
     }
 
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 5000);
     try {
-      const res = await fetch(`${baseUrl}/kyc/status/${encodeURIComponent(idUser)}`, {
+      const res = await fetchWithRetry(`${baseUrl}/kyc/status/${encodeURIComponent(idUser)}`, {
         headers: { 'x-internal-key': key },
-        signal: controller.signal,
       });
       if (!res.ok) throw new Error(`KYC respondió ${res.status}`);
       const body = await res.json() as { verified?: boolean; nombreCompleto?: string | null };
@@ -38,8 +36,6 @@ export class KycClientService {
       throw new ServiceUnavailableException(
         'No se pudo confirmar la verificación de identidad. Inténtalo de nuevo en unos minutos.',
       );
-    } finally {
-      clearTimeout(timer);
     }
   }
 
