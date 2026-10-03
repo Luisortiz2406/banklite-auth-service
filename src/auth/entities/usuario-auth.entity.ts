@@ -27,8 +27,18 @@ export class UsuarioAuth {
   @Column({ unique: true })
   email: string;
 
+  // Nombre de usuario para iniciar sesión (minúsculas). Nulo en cuentas creadas
+  // antes de que existiera: esas entran con su correo.
+  @Index({ unique: true })
+  @Column({ type: 'varchar', length: 30, nullable: true })
+  username: string | null;
+
   @Column({ name: 'password_hash' })
   passwordHash: string;
+
+  // Esquema del hash (ver PasswordHasher): 1 = bcrypt, 2 = bcrypt con pepper.
+  @Column({ name: 'password_hash_version', type: 'smallint', default: 1 })
+  passwordHashVersion: number;
 
   @Column({ name: 'mfa_secret', type: 'varchar', nullable: true })
   mfaSecret: string | null;

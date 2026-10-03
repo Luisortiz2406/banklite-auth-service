@@ -1,6 +1,6 @@
 import { Body, Controller, HttpCode, HttpStatus, Post } from '@nestjs/common';
 import { AuthService } from './auth.service';
-import { LoginDto } from './dto/login.dto';
+import { LoginDto, UsernameCheckDto } from './dto/login.dto';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
 import { RegisterDto } from './dto/register.dto';
 import { IsEmail, IsIn, IsOptional, IsString, IsUUID, Matches, MinLength } from 'class-validator';
@@ -41,6 +41,12 @@ export class AuthController {
   @HttpCode(HttpStatus.CREATED)
   register(@Body() dto: RegisterDto) {
     return this.authService.register(dto);
+  }
+
+  @Post('username/check')
+  @HttpCode(HttpStatus.OK)
+  checkUsername(@Body() dto: UsernameCheckDto) {
+    return this.authService.checkUsernameAvailability(dto.username);
   }
 
   @Post('email/check')

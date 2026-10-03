@@ -12,6 +12,7 @@ import * as bcrypt from 'bcryptjs';
 import { createHash, randomInt, randomUUID } from 'crypto';
 import { MoreThan, Repository } from 'typeorm';
 import { EventPublisherService } from '../events/event-publisher.service';
+import { PasswordHasher } from './password-hasher.service';
 import { LoginDto } from './dto/login.dto';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
 import { RegisterDto } from './dto/register.dto';
@@ -40,6 +41,7 @@ export class AuthService {
     private readonly jwt: JwtService,
     private readonly config: ConfigService,
     private readonly events: EventPublisherService,
+    private readonly hasher: PasswordHasher,
     private readonly emailService: EmailService,
     private readonly kycClient: KycClientService,
     private readonly whatsappOtp: WhatsappOtpClientService,
@@ -231,7 +233,9 @@ export class AuthService {
       throw new BadRequestException('Código incorrecto o vencido.');
     }
 
-    user.passwordHash = await bcrypt.hash(password, 12);
+    const hashed = await this.hasher.hash(password);
+    user.passwordHash = hashed.hash;
+    user.passwordHashVersion = hashed.version;
     user.failedLoginAttempts = 0;
     user.status = 'active';
     user.blockedUntil = null;
@@ -285,11 +289,18 @@ export class AuthService {
       throw new ConflictException('Ya existe una cuenta con esos datos.');
     }
 
-    const passwordHash = await bcrypt.hash(dto.password, 12);
+    const username = dto.username?.trim().toLowerCase() || null;
+    if (username && (await this.usuarios.findOne({ where: { username } }))) {
+      throw new ConflictException('Ese usuario ya está en uso. Elige otro.');
+    }
+
+    const hashed = await this.hasher.hash(dto.password);
     const usuario = this.usuarios.create({
       idUser: dto.idUser,
       email,
-      passwordHash,
+      username,
+      passwordHash: hashed.hash,
+      passwordHashVersion: hashed.version,
       mfaSecret: null,
       mfaEnabled: false,
       status: 'active',
@@ -320,11 +331,22 @@ export class AuthService {
     };
   }
 
+  /** POST /auth/username/check — disponibilidad del nombre de usuario en el registro. */
+  async checkUsernameAvailability(username: string) {
+    const exists = await this.usuarios.findOne({ where: { username: username.trim().toLowerCase() } });
+    return { available: !exists };
+  }
+
   /** POST /auth/login — valida credenciales y entrega el access token directamente. */
   async login(dto: LoginDto) {
-    const usuario = await this.findUserByEmail(dto.email);
+    if (!dto.email && !dto.username) throw new BadRequestException('Ingresa tu usuario o tu correo.');
+    const usuario = dto.username
+      ? await this.usuarios.findOne({ where: { username: dto.username.trim().toLowerCase() } })
+      : await this.findUserByEmail(dto.email as string);
 
     if (!usuario) {
+      // Mismo tiempo de respuesta que con un usuario real: no revela cuáles existen.
+      await this.hasher.verify(dto.password, null, 1);
       throw new UnauthorizedException('Credenciales inválidas');
     }
 
@@ -339,7 +361,14 @@ export class AuthService {
       await this.usuarios.save(usuario);
     }
 
-    const passwordValida = await bcrypt.compare(dto.password, usuario.passwordHash);
+    const check = await this.hasher.verify(dto.password, usuario.passwordHash, usuario.passwordHashVersion);
+    const passwordValida = check.valid;
+    if (check.needsUpgrade) {
+      // Migración transparente: la clave se vuelve a guardar con el esquema actual.
+      const upgraded = await this.hasher.hash(dto.password);
+      usuario.passwordHash = upgraded.hash;
+      usuario.passwordHashVersion = upgraded.version;
+    }
 
     if (!passwordValida) {
       usuario.failedLoginAttempts += 1;

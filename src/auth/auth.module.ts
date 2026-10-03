@@ -13,6 +13,7 @@ import { PasswordResetChallenge } from './entities/password-reset-challenge.enti
 import { EmailService } from './email.service';
 import { KycClientService } from './kyc-client.service';
 import { WhatsappOtpClientService } from './whatsapp-otp-client.service';
+import { PasswordHasher } from './password-hasher.service';
 
 @Module({
   imports: [
@@ -27,6 +28,7 @@ import { WhatsappOtpClientService } from './whatsapp-otp-client.service';
     EmailService,
     KycClientService,
     WhatsappOtpClientService,
+    PasswordHasher,
   ],
   exports: [EventPublisherService],
 })
