@@ -28,5 +28,6 @@ import { WhatsappOtpClientService } from './whatsapp-otp-client.service';
     KycClientService,
     WhatsappOtpClientService,
   ],
+  exports: [EventPublisherService],
 })
 export class AuthModule {}

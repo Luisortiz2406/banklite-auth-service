@@ -48,6 +48,17 @@ export class UsuarioAuth {
   @Column({ name: 'blocked_until', type: 'timestamptz', nullable: true })
   blockedUntil: Date | null;
 
+  // Suspensión manual desde el panel administrativo (distinta del bloqueo
+  // temporal por intentos fallidos): solo un empleado la puede levantar.
+  @Column({ name: 'disabled_by_bank', default: false })
+  disabledByBank: boolean;
+
+  @Column({ name: 'disabled_reason', type: 'varchar', length: 300, nullable: true })
+  disabledReason: string | null;
+
+  @Column({ name: 'disabled_at', type: 'timestamptz', nullable: true })
+  disabledAt: Date | null;
+
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
 

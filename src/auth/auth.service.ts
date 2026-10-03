@@ -3,6 +3,7 @@ import {
   BadRequestException,
   ConflictException,
   UnauthorizedException,
+  ForbiddenException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
@@ -360,6 +361,12 @@ export class AuthService {
       throw new UnauthorizedException('Credenciales inválidas');
     }
 
+    // Suspensión manual del banco: se informa solo con la contraseña correcta,
+    // para no revelar a terceros el estado de una cuenta.
+    if (usuario.disabledByBank) {
+      throw new ForbiddenException('Tu acceso fue suspendido por el banco. Comunícate con soporte.');
+    }
+
     // Login correcto: resetea contador de intentos fallidos.
     usuario.failedLoginAttempts = 0;
     usuario.blockedUntil = null;
@@ -431,6 +438,11 @@ export class AuthService {
 
     if (!sesionValida || !sesionValida.mfaVerified) {
       throw new UnauthorizedException('Sesión revocada, expirada o sin MFA verificado');
+    }
+
+    const usuario = await this.usuarios.findOne({ where: { idUser: payload.sub } });
+    if (!usuario || usuario.disabledByBank) {
+      throw new UnauthorizedException('El acceso de esta cuenta está suspendido.');
     }
 
     const accessToken = this.issueAccessToken(payload.sub);
