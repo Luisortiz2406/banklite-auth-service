@@ -14,6 +14,8 @@ import { EmailService } from './email.service';
 import { KycClientService } from './kyc-client.service';
 import { WhatsappOtpClientService } from './whatsapp-otp-client.service';
 import { PasswordHasher } from './password-hasher.service';
+import { DynamicKeyController } from './dynamic-key.controller';
+import { DynamicKeyService } from './dynamic-key.service';
 
 @Module({
   imports: [
@@ -21,7 +23,7 @@ import { PasswordHasher } from './password-hasher.service';
     TypeOrmModule.forFeature([UsuarioAuth, SesionActiva, EmailVerification, PhoneVerification, PasswordResetChallenge]),
     JwtModule.register({}), // secreto/expiración se pasan por llamada (login/refresh)
   ],
-  controllers: [AuthController],
+  controllers: [AuthController, DynamicKeyController],
   providers: [
     AuthService,
     EventPublisherService,
@@ -29,6 +31,7 @@ import { PasswordHasher } from './password-hasher.service';
     KycClientService,
     WhatsappOtpClientService,
     PasswordHasher,
+    DynamicKeyService,
   ],
   exports: [EventPublisherService],
 })
