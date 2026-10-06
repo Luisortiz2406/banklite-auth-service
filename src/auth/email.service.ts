@@ -2,22 +2,24 @@ import {
   Injectable,
   BadRequestException,
   ConflictException,
+  Logger,
   ServiceUnavailableException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import * as bcrypt from 'bcryptjs';
-import * as nodemailer from 'nodemailer';
 import { randomInt } from 'crypto';
 import { promises as dns } from 'dns';
 import { Repository } from 'typeorm';
 import { EmailVerification } from './entities/email-verification.entity';
+import { GmailApiClient, readGmailCredentials } from './gmail-api.client';
 
 const CODE_TTL_SECONDS = 5 * 60;
 
 @Injectable()
 export class EmailService {
-  private transporter: nodemailer.Transporter | null = null;
+  private readonly logger = new Logger('EmailService[auth-service]');
+  private gmail: GmailApiClient | null = null;
 
   constructor(
     @InjectRepository(EmailVerification)
@@ -25,27 +27,23 @@ export class EmailService {
     private readonly config: ConfigService,
   ) {}
 
-  private getTransporter() {
-    if (this.transporter) return this.transporter;
-    const user = this.config.get<string>('GMAIL_SMTP_USER');
-    const pass = this.config.get<string>('GMAIL_SMTP_APP_PASSWORD');
-    if (!user || !pass) {
+  private getGmail() {
+    if (this.gmail) return this.gmail;
+    const creds = readGmailCredentials((key) => this.config.get<string>(key));
+    if (!creds) {
       throw new ServiceUnavailableException(
-        'Gmail SMTP no está configurado. Define GMAIL_SMTP_USER y GMAIL_SMTP_APP_PASSWORD.',
+        'Gmail API no está configurada. Define GMAIL_CLIENT_ID, GMAIL_CLIENT_SECRET, GMAIL_REFRESH_TOKEN y GMAIL_SENDER.',
       );
     }
-    this.transporter = nodemailer.createTransport({
-      service: 'gmail',
-      auth: { user, pass: pass.replace(/\s+/g, '') },
-    });
-    return this.transporter;
+    this.gmail = new GmailApiClient(creds, 'GmailApiClient[auth-service]');
+    return this.gmail;
   }
 
   /**
    * Comprueba que el dominio del correo tenga servidores MX.
    * Esto evita dominios inexistentes, pero no demuestra por sí solo que
    * el buzón concreto exista. La prueba definitiva es que el usuario
-   * reciba y confirme el código enviado por SMTP.
+   * reciba y confirme el código enviado por correo.
    */
   private async validateEmailDomain(email: string) {
     const domain = email.split('@')[1]?.toLowerCase();
@@ -93,19 +91,19 @@ export class EmailService {
     await this.verifications.save(row);
 
     try {
-      await this.getTransporter().sendMail({
-        from: this.config.get<string>('GMAIL_SMTP_USER'),
+      await this.getGmail().send({
         to: email,
         subject: 'BankLite — Código de verificación',
         text: `Tu código de verificación BankLite es ${code}. Expira en 5 minutos.`,
         html: `<div style="font-family:Arial,sans-serif"><h2>BankLite</h2><p>Tu código de verificación es:</p><div style="font-size:32px;font-weight:700;letter-spacing:8px">${code}</div><p>Expira en 5 minutos.</p></div>`,
       });
     } catch (error) {
-      // No dejamos un código utilizable si Gmail no pudo aceptar el envío.
-      row.verified = false;
-      await this.verifications.save(row);
+      // El código nunca llegó: se borra para que el usuario pueda pedir otro de inmediato
+      // en vez de esperar a que venza uno que no recibió.
+      await this.verifications.delete({ idUser });
+      this.logger.error(`No se pudo enviar el código de verificación: ${(error as Error).message}`);
       throw new ServiceUnavailableException(
-        'Gmail SMTP no pudo entregar/aceptar el mensaje. Verifica el correo e inténtalo nuevamente.',
+        'No se pudo enviar el correo con el código. Verifica el correo e inténtalo nuevamente.',
       );
     }
 
@@ -145,26 +143,20 @@ export class EmailService {
       <p>Atentamente,<br>El equipo de seguridad de BankLite</p>
       <p style="color:#6b7a75;font-size:12px;margin-top:24px">Este es un correo automático enviado por seguridad, por favor no respondas a este mensaje.</p>
     </div>`;
-    await this.getTransporter().sendMail({
-      from: this.config.get<string>('GMAIL_SMTP_USER'),
-      to: email,
-      subject,
-      text,
-      html,
-    });
+    await this.getGmail().send({ to: email, subject, text, html });
   }
 
   async sendPasswordResetCode(email: string, code: string) {
     await this.validateEmailDomain(email);
     try {
-      await this.getTransporter().sendMail({
-        from: this.config.get<string>('GMAIL_SMTP_USER'),
+      await this.getGmail().send({
         to: email,
         subject: 'BankLite — Código para cambiar tu clave',
         text: `Tu código para cambiar la clave de BankLite es ${code}. Expira en 5 minutos. Si no solicitaste este cambio, ignora este mensaje.`,
         html: `<div style="font-family:Arial,sans-serif;color:#202824;max-width:560px;margin:0 auto;padding:24px"><h2 style="color:#18794e">BankLite</h2><p>Usa este código de 6 dígitos para cambiar tu clave:</p><p style="font-size:32px;font-weight:700;letter-spacing:8px;color:#17241e">${code}</p><p>El código expira en 5 minutos. Si no solicitaste este cambio, ignora este mensaje.</p></div>`,
       });
-    } catch {
+    } catch (error) {
+      this.logger.error(`No se pudo enviar el código de recuperación: ${(error as Error).message}`);
       throw new ServiceUnavailableException('No se pudo enviar el código de recuperación por correo.');
     }
   }
