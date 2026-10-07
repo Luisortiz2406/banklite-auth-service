@@ -504,6 +504,7 @@ export class AuthService {
       // jti hace único cada refresh token aunque se emitan dos en el mismo segundo.
       { sub: usuario.idUser, type: 'refresh', jti: randomUUID() },
       {
+        algorithm: 'HS256',
         secret: this.config.get('JWT_SECRET'),
         expiresIn: this.config.get('JWT_REFRESH_EXPIRES_IN', '7d'),
       },
@@ -544,6 +545,7 @@ export class AuthService {
     try {
       payload = this.jwt.verify(dto.refreshToken, {
         secret: this.config.get('JWT_SECRET'),
+        algorithms: ['HS256'],
       });
     } catch {
       throw new UnauthorizedException('Refresh token inválido o expirado');
@@ -579,6 +581,7 @@ export class AuthService {
     return this.jwt.sign(
       { sub: idUser, type: 'access' },
       {
+        algorithm: 'HS256',
         secret: this.config.get('JWT_SECRET'),
         expiresIn: this.config.get('JWT_ACCESS_EXPIRES_IN', '15m'),
       },

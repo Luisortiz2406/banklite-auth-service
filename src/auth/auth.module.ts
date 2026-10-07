@@ -16,6 +16,7 @@ import { WhatsappOtpClientService } from './whatsapp-otp-client.service';
 import { PasswordHasher } from './password-hasher.service';
 import { DynamicKeyController } from './dynamic-key.controller';
 import { DynamicKeyService } from './dynamic-key.service';
+import { InternalKeyGuard } from '../common/guards/internal-key.guard';
 
 @Module({
   imports: [
@@ -32,6 +33,7 @@ import { DynamicKeyService } from './dynamic-key.service';
     WhatsappOtpClientService,
     PasswordHasher,
     DynamicKeyService,
+    InternalKeyGuard,
   ],
   exports: [EventPublisherService],
 })

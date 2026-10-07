@@ -1,18 +1,18 @@
 import {
   Body,
   Controller,
-  ForbiddenException,
   Get,
   Headers,
   HttpCode,
   HttpStatus,
   Post,
   UnauthorizedException,
+  UseGuards,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { IsUUID, Matches } from 'class-validator';
-import { timingSafeEqual } from 'crypto';
+import { InternalKeyGuard } from '../common/guards/internal-key.guard';
 import { DynamicKeyService } from './dynamic-key.service';
 
 class VerifyDynamicKeyDto {
@@ -40,18 +40,18 @@ export class DynamicKeyController {
    */
   @Post('internal/dynamic-key/verify')
   @HttpCode(HttpStatus.OK)
-  verify(@Body() dto: VerifyDynamicKeyDto, @Headers('x-internal-key') key?: string) {
-    const expected = this.config.get<string>('INTERNAL_API_KEY');
-    if (!expected || !key || key.length !== expected.length || !timingSafeEqual(Buffer.from(key), Buffer.from(expected))) {
-      throw new ForbiddenException('Acceso interno no autorizado.');
-    }
+  @UseGuards(InternalKeyGuard)
+  verify(@Body() dto: VerifyDynamicKeyDto) {
     return this.dynamicKeys.verify(dto.idUser, dto.code);
   }
 
   private userFromToken(authorization?: string): string {
     if (!authorization?.startsWith('Bearer ')) throw new UnauthorizedException('Token no proporcionado');
     try {
-      const payload = this.jwt.verify(authorization.slice(7), { secret: this.config.get<string>('JWT_SECRET') });
+      const payload = this.jwt.verify(authorization.slice(7), {
+        secret: this.config.get<string>('JWT_SECRET'),
+        algorithms: ['HS256'],
+      });
       if (payload.type !== 'access' || !payload.sub) throw new Error();
       return payload.sub;
     } catch {

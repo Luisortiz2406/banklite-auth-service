@@ -8,8 +8,10 @@ import { UsuarioAuth } from './entities/usuario-auth.entity';
 /**
  * Clave dinámica (token de software, como el de los bancos): código de 6
  * dígitos que cambia cada 60 segundos. Es un TOTP (RFC 6238, HMAC-SHA1) con
- * un secreto por usuario derivado de DYNAMIC_KEY_SECRET (o JWT_SECRET), así
- * que no se guarda ningún secreto en la base.
+ * un secreto por usuario derivado de DYNAMIC_KEY_SECRET, así que no se guarda
+ * ningún secreto en la base. DYNAMIC_KEY_SECRET es obligatorio e independiente
+ * de JWT_SECRET: si se filtrara el secreto de los tokens, no permitiría
+ * calcular las claves dinámicas (y viceversa).
  *
  * - Transferencias dentro de Banklite: la app envía sola el código vigente y
  *   transfer-service lo valida aquí; la persona no lo escribe.
@@ -78,8 +80,9 @@ export class DynamicKeyService {
   }
 
   private secretFor(idUser: string): Buffer {
-    const master = this.config.get<string>('DYNAMIC_KEY_SECRET') || this.config.get<string>('JWT_SECRET');
-    if (!master) throw new Error('DYNAMIC_KEY_SECRET o JWT_SECRET deben estar configurados.');
+    // Nunca se degrada a otro secreto; validateEnv impide arrancar sin él.
+    const master = this.config.get<string>('DYNAMIC_KEY_SECRET');
+    if (!master) throw new Error('DYNAMIC_KEY_SECRET no está configurado.');
     return createHmac('sha256', master).update(`banklite-dynamic-key:${idUser}`).digest();
   }
 

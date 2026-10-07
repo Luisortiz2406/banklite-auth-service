@@ -79,7 +79,7 @@ export class AdminStaffService implements OnModuleInit {
 
     const accessToken = this.jwt.sign(
       { sub: user.id, type: 'staff', role: user.role, username: user.username },
-      { secret: this.staffSecret(), expiresIn: this.config.get('STAFF_JWT_EXPIRES_IN', '8h') },
+      { algorithm: 'HS256', secret: this.staffSecret(), expiresIn: this.config.get('STAFF_JWT_EXPIRES_IN', '8h') },
     );
     return { accessToken, staff: this.publicStaff(user) };
   }

@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcryptjs';
 import { createHmac } from 'crypto';
@@ -18,16 +18,17 @@ const DUMMY_HASH = bcrypt.hashSync('usuario-inexistente', 12);
  */
 @Injectable()
 export class PasswordHasher {
-  private readonly logger = new Logger('PasswordHasher');
-  private readonly pepper: string | null;
+  private readonly pepper: string;
 
+  // Obligatorio: sin pepper un PIN de 4 dígitos se descifra en segundos con la
+  // base robada. validateEnv ya impide arrancar sin él; esto es la segunda barrera.
   constructor(config: ConfigService) {
-    this.pepper = config.get<string>('PASSWORD_PEPPER') || null;
-    if (!this.pepper) this.logger.warn('PASSWORD_PEPPER no configurado: las claves se guardan solo con bcrypt.');
+    const pepper = config.get<string>('PASSWORD_PEPPER');
+    if (!pepper) throw new Error('PASSWORD_PEPPER no está configurado.');
+    this.pepper = pepper;
   }
 
   async hash(password: string): Promise<{ hash: string; version: PasswordHashVersion }> {
-    if (!this.pepper) return { hash: await bcrypt.hash(password, 12), version: 1 };
     return { hash: await bcrypt.hash(this.peppered(password), 12), version: 2 };
   }
 
@@ -38,17 +39,14 @@ export class PasswordHasher {
       return { valid: false, needsUpgrade: false };
     }
     if (version === 2) {
-      if (!this.pepper) {
-        this.logger.error('Hay claves con pepper pero PASSWORD_PEPPER no está configurado.');
-        return { valid: false, needsUpgrade: false };
-      }
       return { valid: await bcrypt.compare(this.peppered(password), hash), needsUpgrade: false };
     }
+    // Claves guardadas antes del pepper: se aceptan y se re-guardan con pepper.
     const valid = await bcrypt.compare(password, hash);
-    return { valid, needsUpgrade: valid && !!this.pepper };
+    return { valid, needsUpgrade: valid };
   }
 
   private peppered(password: string) {
-    return createHmac('sha256', this.pepper as string).update(password).digest('base64');
+    return createHmac('sha256', this.pepper).update(password).digest('base64');
   }
 }

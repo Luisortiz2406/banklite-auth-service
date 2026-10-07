@@ -12,10 +12,27 @@ import { AdminModule } from './admin/admin.module';
 import { StaffUser } from './admin/entities/staff-user.entity';
 import { AdminAudit } from './common/staff/admin-audit.entity';
 import { HealthController } from './health.controller';
+import { validateEnv } from './config/env.validation';
 
 @Module({
   imports: [
-    ConfigModule.forRoot({ isGlobal: true, envFilePath: '.env' }),
+    ConfigModule.forRoot({
+      isGlobal: true,
+      envFilePath: '.env',
+      validate: validateEnv(
+        [
+        { key: 'JWT_SECRET', type: 'secret' },
+        { key: 'STAFF_JWT_SECRET', type: 'secret' },
+        { key: 'DYNAMIC_KEY_SECRET', type: 'secret' },
+        { key: 'PASSWORD_PEPPER', type: 'secret' },
+        { key: 'INTERNAL_API_KEY', type: 'secret' },
+        { key: 'INTERNAL_TRUSTED_KEYS', type: 'trusted-keys' },
+        { key: 'DATABASE_URL', type: 'url' },
+        { key: 'RABBITMQ_URL', type: 'url', optional: true },
+      ],
+        ['JWT_SECRET', 'STAFF_JWT_SECRET', 'DYNAMIC_KEY_SECRET', 'PASSWORD_PEPPER', 'INTERNAL_API_KEY'],
+      ),
+    }),
     TypeOrmModule.forRootAsync({
       inject: [ConfigService],
       useFactory: (config: ConfigService) => ({
