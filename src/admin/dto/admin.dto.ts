@@ -44,6 +44,17 @@ export class UpdateStaffDto {
   password?: string;
 }
 
+/** Cambio de la contraseña propia (cualquier empleado). */
+export class ChangeOwnPasswordDto {
+  @IsString()
+  @MaxLength(200)
+  currentPassword: string;
+
+  @Matches(PASSWORD_RULE, { message: PASSWORD_MESSAGE })
+  @MaxLength(200)
+  newPassword: string;
+}
+
 export class ReasonDto {
   @IsString()
   @MinLength(5, { message: 'Escribe el motivo (mínimo 5 caracteres).' })

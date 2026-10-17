@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Injectable,
   Logger,
   NotFoundException,
@@ -127,6 +128,46 @@ export class AdminStaffService implements OnModuleInit {
       await this.audit.record(actor, { action: 'staff.update', targetType: 'staff', targetId: id, details: changes }, manager);
     });
     return this.publicStaff(user);
+  }
+
+  /**
+   * Cambio de la contraseña propia: exige la actual. Una contraseña actual
+   * incorrecta cuenta como intento fallido de ingreso (5 → bloqueo de 15 min),
+   * así no sirve para adivinarla con una sesión abierta.
+   */
+  async changeOwnPassword(actor: StaffPrincipal, currentPassword: string, newPassword: string) {
+    const user = await this.staff.findOne({ where: { id: actor.id } });
+    if (!user || !user.active) throw new UnauthorizedException('Empleado inactivo.');
+    if (user.lockedUntil && user.lockedUntil.getTime() > Date.now()) {
+      throw new ForbiddenException('Usuario bloqueado temporalmente por intentos fallidos. Intenta en 15 minutos.');
+    }
+
+    if (!(await bcrypt.compare(currentPassword, user.passwordHash))) {
+      user.failedLoginAttempts += 1;
+      const locked = user.failedLoginAttempts >= MAX_FAILED_LOGINS;
+      if (locked) {
+        user.lockedUntil = new Date(Date.now() + LOCK_MS);
+        user.failedLoginAttempts = 0;
+        this.logger.warn(`Empleado '${user.username}' bloqueado 15 min por intentos fallidos al cambiar su contraseña.`);
+      }
+      await this.staff.save(user);
+      if (locked) throw new ForbiddenException('Usuario bloqueado temporalmente por intentos fallidos. Intenta en 15 minutos.');
+      throw new BadRequestException('La contraseña actual no es correcta.');
+    }
+    if (await bcrypt.compare(newPassword, user.passwordHash)) {
+      throw new BadRequestException('La contraseña nueva debe ser distinta de la actual.');
+    }
+    if (newPassword.toLowerCase().includes(user.username)) {
+      throw new BadRequestException('La contraseña no puede contener tu usuario.');
+    }
+
+    user.passwordHash = await bcrypt.hash(newPassword, 12);
+    user.failedLoginAttempts = 0;
+    await this.staff.manager.transaction(async (manager) => {
+      await manager.save(user);
+      await this.audit.record(actor, { action: 'staff.password_change', targetType: 'staff', targetId: user.id }, manager);
+    });
+    return { changed: true };
   }
 
   private staffSecret() {

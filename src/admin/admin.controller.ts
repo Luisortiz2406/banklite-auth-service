@@ -4,7 +4,7 @@ import { StaffAuthGuard, StaffPrincipal, StaffRoles } from '../common/staff/staf
 import { EventPublisherService } from '../events/event-publisher.service';
 import { AdminCustomersService } from './admin-customers.service';
 import { AdminStaffService } from './admin-staff.service';
-import { CreateStaffDto, PageQueryDto, ReasonDto, StaffLoginDto, UpdateStaffDto } from './dto/admin.dto';
+import { ChangeOwnPasswordDto, CreateStaffDto, PageQueryDto, ReasonDto, StaffLoginDto, UpdateStaffDto } from './dto/admin.dto';
 
 const staffOf = (req: any): StaffPrincipal => req.staff;
 
@@ -28,6 +28,14 @@ export class AdminController {
   @UseGuards(StaffAuthGuard)
   me(@Req() req: any) {
     return this.staff.me(staffOf(req).id);
+  }
+
+  /** Cualquier empleado cambia su propia contraseña (exige la actual). */
+  @Post('me/password')
+  @HttpCode(200)
+  @UseGuards(StaffAuthGuard)
+  changeOwnPassword(@Body() dto: ChangeOwnPasswordDto, @Req() req: any) {
+    return this.staff.changeOwnPassword(staffOf(req), dto.currentPassword, dto.newPassword);
   }
 
   @Get('staff')
