@@ -123,7 +123,7 @@ A través del gateway las rutas son las mismas (`http://localhost:8080/auth/...`
 | POST | `/auth/password-recovery/send` | Envía el código para recuperar la contraseña. |
 | POST | `/auth/password-recovery/reset` | Cambia la contraseña con el código. |
 | POST | `/auth/refresh-token` | Renueva el token de acceso. |
-| GET | `/health` | Estado del servicio (incluye si la conexión a la base quedó inicializada). |
+| GET | `/health` | Estado del servicio y de su base (`SELECT 1`); responde 503 con `status: down` si la base no contesta. |
 
 ### Del cliente (`Authorization: Bearer <token de acceso>`)
 
@@ -206,6 +206,6 @@ Desplegado en Railway (raíz del servicio: esta carpeta, `railway.json` con
 `healthcheckPath: /health`). El servicio no tiene dominio público propio: se accede
 por el gateway.
 
-- Estado de todos los servicios (incluye `auth-service`): https://api-gateway-production-dd7f.up.railway.app/health
+- Estado del servicio y de su base: https://api-gateway-production-dd7f.up.railway.app/health (entrada `auth-service`: `status` y `database` deben estar en `ok`)
 - Rutas de este servicio: `https://api-gateway-production-dd7f.up.railway.app/auth/...`
 - Aplicación web: https://frontend-production-eff3c.up.railway.app
