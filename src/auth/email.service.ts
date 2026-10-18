@@ -81,11 +81,20 @@ export class EmailService {
 
     if (!row) {
       row = this.verifications.create({
-        idUser, email, codeHash, expiresAt, attempts: 0, verified: false,
+        idUser,
+        email,
+        codeHash,
+        expiresAt,
+        attempts: 0,
+        verified: false,
       });
     } else {
       Object.assign(row, {
-        email, codeHash, expiresAt, attempts: 0, verified: false,
+        email,
+        codeHash,
+        expiresAt,
+        attempts: 0,
+        verified: false,
       });
     }
     await this.verifications.save(row);

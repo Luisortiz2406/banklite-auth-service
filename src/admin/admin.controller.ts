@@ -4,7 +4,14 @@ import { StaffAuthGuard, StaffPrincipal, StaffRoles } from '../common/staff/staf
 import { EventPublisherService } from '../events/event-publisher.service';
 import { AdminCustomersService } from './admin-customers.service';
 import { AdminStaffService } from './admin-staff.service';
-import { ChangeOwnPasswordDto, CreateStaffDto, PageQueryDto, ReasonDto, StaffLoginDto, UpdateStaffDto } from './dto/admin.dto';
+import {
+  ChangeOwnPasswordDto,
+  CreateStaffDto,
+  PageQueryDto,
+  ReasonDto,
+  StaffLoginDto,
+  UpdateStaffDto,
+} from './dto/admin.dto';
 
 const staffOf = (req: any): StaffPrincipal => req.staff;
 

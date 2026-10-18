@@ -30,10 +30,14 @@ export class AdminCustomersService {
     }
     if (status === 'disabled') qb.andWhere('u.disabledByBank = true');
     if (status === 'locked') qb.andWhere('u.blockedUntil > now()');
-    if (status === 'active') qb.andWhere('u.disabledByBank = false').andWhere('(u.blockedUntil IS NULL OR u.blockedUntil <= now())');
+    if (status === 'active')
+      qb.andWhere('u.disabledByBank = false').andWhere('(u.blockedUntil IS NULL OR u.blockedUntil <= now())');
 
     const take = Math.min(limit, 100);
-    const [rows, total] = await qb.skip((page - 1) * take).take(take).getManyAndCount();
+    const [rows, total] = await qb
+      .skip((page - 1) * take)
+      .take(take)
+      .getManyAndCount();
     return { items: rows.map((u) => this.publicCustomer(u)), total, page, limit: take };
   }
 
@@ -54,7 +58,11 @@ export class AdminCustomersService {
       Object.assign(user, { disabledByBank: true, disabledReason: reason.trim(), disabledAt: new Date() });
       await manager.save(user);
       await manager.update(SesionActiva, { idUser, activa: true }, { activa: false });
-      await this.audit.record(actor, { action: 'customer.disable', targetType: 'customer', targetId: idUser, reason }, manager);
+      await this.audit.record(
+        actor,
+        { action: 'customer.disable', targetType: 'customer', targetId: idUser, reason },
+        manager,
+      );
     });
     return this.detail(idUser);
   }
@@ -63,7 +71,8 @@ export class AdminCustomersService {
   async enable(idUser: string, reason: string, actor: StaffPrincipal) {
     const user = await this.find(idUser);
     const wasLocked = !!user.blockedUntil && user.blockedUntil.getTime() > Date.now();
-    if (!user.disabledByBank && !wasLocked) throw new BadRequestException('El acceso del cliente no está suspendido ni bloqueado.');
+    if (!user.disabledByBank && !wasLocked)
+      throw new BadRequestException('El acceso del cliente no está suspendido ni bloqueado.');
     await this.usuarios.manager.transaction(async (manager) => {
       Object.assign(user, {
         disabledByBank: false,
@@ -74,7 +83,11 @@ export class AdminCustomersService {
         blockedUntil: null,
       });
       await manager.save(user);
-      await this.audit.record(actor, { action: 'customer.enable', targetType: 'customer', targetId: idUser, reason, details: { wasLocked } }, manager);
+      await this.audit.record(
+        actor,
+        { action: 'customer.enable', targetType: 'customer', targetId: idUser, reason, details: { wasLocked } },
+        manager,
+      );
     });
     return this.detail(idUser);
   }

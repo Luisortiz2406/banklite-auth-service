@@ -16,6 +16,8 @@ export class LoginDto {
 }
 
 export class UsernameCheckDto {
-  @Matches(/^[a-zA-Z0-9._-]{3,30}$/, { message: 'El usuario debe tener de 3 a 30 letras, números, punto, guion o guion bajo.' })
+  @Matches(/^[a-zA-Z0-9._-]{3,30}$/, {
+    message: 'El usuario debe tener de 3 a 30 letras, números, punto, guion o guion bajo.',
+  })
   username: string;
 }

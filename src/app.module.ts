@@ -21,15 +21,15 @@ import { validateEnv } from './config/env.validation';
       envFilePath: '.env',
       validate: validateEnv(
         [
-        { key: 'JWT_SECRET', type: 'secret' },
-        { key: 'STAFF_JWT_SECRET', type: 'secret' },
-        { key: 'DYNAMIC_KEY_SECRET', type: 'secret' },
-        { key: 'PASSWORD_PEPPER', type: 'secret' },
-        { key: 'INTERNAL_API_KEY', type: 'secret' },
-        { key: 'INTERNAL_TRUSTED_KEYS', type: 'trusted-keys' },
-        { key: 'DATABASE_URL', type: 'url' },
-        { key: 'RABBITMQ_URL', type: 'url', optional: true },
-      ],
+          { key: 'JWT_SECRET', type: 'secret' },
+          { key: 'STAFF_JWT_SECRET', type: 'secret' },
+          { key: 'DYNAMIC_KEY_SECRET', type: 'secret' },
+          { key: 'PASSWORD_PEPPER', type: 'secret' },
+          { key: 'INTERNAL_API_KEY', type: 'secret' },
+          { key: 'INTERNAL_TRUSTED_KEYS', type: 'trusted-keys' },
+          { key: 'DATABASE_URL', type: 'url' },
+          { key: 'RABBITMQ_URL', type: 'url', optional: true },
+        ],
         ['JWT_SECRET', 'STAFF_JWT_SECRET', 'DYNAMIC_KEY_SECRET', 'PASSWORD_PEPPER', 'INTERNAL_API_KEY'],
       ),
     }),
@@ -38,7 +38,16 @@ import { validateEnv } from './config/env.validation';
       useFactory: (config: ConfigService) => ({
         type: 'postgres',
         url: config.get<string>('DATABASE_URL'),
-        entities: [UsuarioAuth, SesionActiva, EmailVerification, PhoneVerification, PasswordResetChallenge, EventOutbox, StaffUser, AdminAudit],
+        entities: [
+          UsuarioAuth,
+          SesionActiva,
+          EmailVerification,
+          PhoneVerification,
+          PasswordResetChallenge,
+          EventOutbox,
+          StaffUser,
+          AdminAudit,
+        ],
         // synchronize=true es aceptable para desarrollo/demo académica;
         // en producción se usarían migraciones versionadas (ver 9.4 del doc).
         synchronize: true,

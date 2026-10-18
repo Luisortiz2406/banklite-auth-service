@@ -15,7 +15,9 @@ const PASSWORD_RULE = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{12,}$/;
 const PASSWORD_MESSAGE = 'La contraseña debe tener al menos 12 caracteres, con mayúsculas, minúsculas y números.';
 
 export class CreateStaffDto {
-  @Matches(/^[a-z0-9._-]{3,40}$/, { message: 'El usuario solo admite minúsculas, números, punto, guion y guion bajo (3 a 40).' })
+  @Matches(/^[a-z0-9._-]{3,40}$/, {
+    message: 'El usuario solo admite minúsculas, números, punto, guion y guion bajo (3 a 40).',
+  })
   username: string;
 
   @IsString()

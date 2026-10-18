@@ -32,7 +32,8 @@ const PASSWORD_RESET_RESEND_SECONDS = 60;
 const PASSWORD_RESET_MAX_ATTEMPTS = 5;
 // Intentos fallidos de recuperación (dato ajeno o código malo) antes de bloquearla.
 const MAX_RECOVERY_FAILURES = 3;
-const RECOVERY_BLOCKED_MESSAGE = 'Excediste tus intentos, tu cambio de clave fue bloqueado. Se desbloquea cuando inicies sesión.';
+const RECOVERY_BLOCKED_MESSAGE =
+  'Excediste tus intentos, tu cambio de clave fue bloqueado. Se desbloquea cuando inicies sesión.';
 const REFRESH_TOKEN_DAYS = 7;
 
 @Injectable()
@@ -56,7 +57,6 @@ export class AuthService {
     @InjectRepository(PasswordResetChallenge)
     private readonly passwordResetChallenges: Repository<PasswordResetChallenge>,
   ) {}
-
 
   private normalizeEmail(email: string): string {
     return email.trim().toLowerCase();
@@ -193,7 +193,9 @@ export class AuthService {
     let name = user.username || 'cliente';
     try {
       name = (await this.kycClient.getIdentityStatus(user.idUser)).nombreCompleto || name;
-    } catch { /* sin nombre de KYC se usa el usuario */ }
+    } catch {
+      /* sin nombre de KYC se usa el usuario */
+    }
     try {
       await this.emailService.sendRecoveryBlockedAlert(user.email, name, user.recoveryFailedAttempts);
     } catch (error) {
@@ -230,7 +232,10 @@ export class AuthService {
     return account;
   }
 
-  async requestPasswordReset(target: { username?: string; email?: string; phone?: string }, channel: 'email' | 'whatsapp') {
+  async requestPasswordReset(
+    target: { username?: string; email?: string; phone?: string },
+    channel: 'email' | 'whatsapp',
+  ) {
     const user = await this.findUserForRecovery(target, channel);
     if (!user) return { accepted: true, expiresInSeconds: PASSWORD_RESET_TTL_SECONDS };
     const normalizedEmail = this.normalizeEmail(user.email);
@@ -349,7 +354,7 @@ export class AuthService {
     const digits = pin.split('').map(Number);
     const ascending = digits.every((d, i) => i === 0 || d === digits[i - 1] + 1);
     const descending = digits.every((d, i) => i === 0 || d === digits[i - 1] - 1);
-    const comunes = new Set(['1234','4321','0123','3210','2580','0852']);
+    const comunes = new Set(['1234', '4321', '0123', '3210', '2580', '0852']);
     return !ascending && !descending && !comunes.has(pin);
   }
 
@@ -404,11 +409,15 @@ export class AuthService {
       // Credenciales y evento en la misma transacción (outbox transaccional).
       await this.usuarios.manager.transaction(async (manager) => {
         await manager.save(usuario);
-        await this.events.publish('account.created', {
-          idUser: usuario.idUser,
-          email: usuario.email,
-          nombreCompleto: identity.nombreCompleto,
-        }, manager);
+        await this.events.publish(
+          'account.created',
+          {
+            idUser: usuario.idUser,
+            email: usuario.email,
+            nombreCompleto: identity.nombreCompleto,
+          },
+          manager,
+        );
       });
     } catch (error) {
       // PostgreSQL unique violation: idUser o correo ya tienen credenciales.
@@ -472,12 +481,16 @@ export class AuthService {
       }
       await this.usuarios.manager.transaction(async (manager) => {
         await manager.save(usuario);
-        await this.events.publish('intento_fallido_login', {
-          idUser: usuario.idUser,
-          email: usuario.email,
-          intentos: usuario.failedLoginAttempts,
-          fechaHora: new Date().toISOString(),
-        }, manager);
+        await this.events.publish(
+          'intento_fallido_login',
+          {
+            idUser: usuario.idUser,
+            email: usuario.email,
+            intentos: usuario.failedLoginAttempts,
+            fechaHora: new Date().toISOString(),
+          },
+          manager,
+        );
       });
       void this.events.flush();
 
@@ -523,11 +536,15 @@ export class AuthService {
     });
     await this.sesiones.manager.transaction(async (manager) => {
       await manager.save(sesion);
-      await this.events.publish('usuario_autenticado', {
-        idUser: usuario.idUser,
-        email: usuario.email,
-        sessionId: sesion.id,
-      }, manager);
+      await this.events.publish(
+        'usuario_autenticado',
+        {
+          idUser: usuario.idUser,
+          email: usuario.email,
+          sessionId: sesion.id,
+        },
+        manager,
+      );
     });
     void this.events.flush();
 

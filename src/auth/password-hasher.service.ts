@@ -33,7 +33,11 @@ export class PasswordHasher {
   }
 
   /** needsUpgrade: la clave es válida pero está guardada con un esquema anterior. */
-  async verify(password: string, hash: string | null, version: number): Promise<{ valid: boolean; needsUpgrade: boolean }> {
+  async verify(
+    password: string,
+    hash: string | null,
+    version: number,
+  ): Promise<{ valid: boolean; needsUpgrade: boolean }> {
     if (!hash) {
       await bcrypt.compare(password, DUMMY_HASH);
       return { valid: false, needsUpgrade: false };

@@ -45,11 +45,18 @@ export class AdminStaffService implements OnModuleInit {
     if (!username || !password) return;
     if ((await this.staff.count()) > 0) return;
     if (password.length < 12) {
-      this.logger.warn('ADMIN_BOOTSTRAP_PASSWORD debe tener al menos 12 caracteres; no se creó el administrador inicial.');
+      this.logger.warn(
+        'ADMIN_BOOTSTRAP_PASSWORD debe tener al menos 12 caracteres; no se creó el administrador inicial.',
+      );
       return;
     }
     await this.staff.save(
-      this.staff.create({ username, nombre: 'Administrador', passwordHash: await bcrypt.hash(password, 12), role: 'admin' }),
+      this.staff.create({
+        username,
+        nombre: 'Administrador',
+        passwordHash: await bcrypt.hash(password, 12),
+        role: 'admin',
+      }),
     );
     this.logger.log(`Administrador inicial '${username}' creado.`);
   }
@@ -98,12 +105,22 @@ export class AdminStaffService implements OnModuleInit {
 
   async create(dto: CreateStaffDto, actor: StaffPrincipal) {
     const username = dto.username.trim().toLowerCase();
-    if (await this.staff.findOne({ where: { username } })) throw new ConflictException('Ya existe un empleado con ese usuario.');
+    if (await this.staff.findOne({ where: { username } }))
+      throw new ConflictException('Ya existe un empleado con ese usuario.');
     const user = await this.staff.manager.transaction(async (manager) => {
       const saved = await manager.save(
-        manager.create(StaffUser, { username, nombre: dto.nombre.trim(), passwordHash: await bcrypt.hash(dto.password, 12), role: dto.role }),
+        manager.create(StaffUser, {
+          username,
+          nombre: dto.nombre.trim(),
+          passwordHash: await bcrypt.hash(dto.password, 12),
+          role: dto.role,
+        }),
       );
-      await this.audit.record(actor, { action: 'staff.create', targetType: 'staff', targetId: saved.id, details: { username, role: dto.role } }, manager);
+      await this.audit.record(
+        actor,
+        { action: 'staff.create', targetType: 'staff', targetId: saved.id, details: { username, role: dto.role } },
+        manager,
+      );
       return saved;
     });
     return this.publicStaff(user);
@@ -125,7 +142,11 @@ export class AdminStaffService implements OnModuleInit {
     }
     await this.staff.manager.transaction(async (manager) => {
       await manager.save(user);
-      await this.audit.record(actor, { action: 'staff.update', targetType: 'staff', targetId: id, details: changes }, manager);
+      await this.audit.record(
+        actor,
+        { action: 'staff.update', targetType: 'staff', targetId: id, details: changes },
+        manager,
+      );
     });
     return this.publicStaff(user);
   }
@@ -148,10 +169,13 @@ export class AdminStaffService implements OnModuleInit {
       if (locked) {
         user.lockedUntil = new Date(Date.now() + LOCK_MS);
         user.failedLoginAttempts = 0;
-        this.logger.warn(`Empleado '${user.username}' bloqueado 15 min por intentos fallidos al cambiar su contraseña.`);
+        this.logger.warn(
+          `Empleado '${user.username}' bloqueado 15 min por intentos fallidos al cambiar su contraseña.`,
+        );
       }
       await this.staff.save(user);
-      if (locked) throw new ForbiddenException('Usuario bloqueado temporalmente por intentos fallidos. Intenta en 15 minutos.');
+      if (locked)
+        throw new ForbiddenException('Usuario bloqueado temporalmente por intentos fallidos. Intenta en 15 minutos.');
       throw new BadRequestException('La contraseña actual no es correcta.');
     }
     if (await bcrypt.compare(newPassword, user.passwordHash)) {
@@ -165,7 +189,11 @@ export class AdminStaffService implements OnModuleInit {
     user.failedLoginAttempts = 0;
     await this.staff.manager.transaction(async (manager) => {
       await manager.save(user);
-      await this.audit.record(actor, { action: 'staff.password_change', targetType: 'staff', targetId: user.id }, manager);
+      await this.audit.record(
+        actor,
+        { action: 'staff.password_change', targetType: 'staff', targetId: user.id },
+        manager,
+      );
     });
     return { changed: true };
   }

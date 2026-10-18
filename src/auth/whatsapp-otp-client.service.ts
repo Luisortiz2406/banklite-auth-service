@@ -1,8 +1,4 @@
-import {
-  BadRequestException,
-  Injectable,
-  ServiceUnavailableException,
-} from '@nestjs/common';
+import { BadRequestException, Injectable, ServiceUnavailableException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 
 interface OtpResponse {
@@ -34,10 +30,7 @@ export class WhatsappOtpClientService {
   }
 
   private async request(path: string, body: Record<string, string>): Promise<OtpResponse> {
-    const baseUrl = this.config.get<string>(
-      'NOTIFICATION_SERVICE_URL',
-      'http://localhost:3005',
-    );
+    const baseUrl = this.config.get<string>('NOTIFICATION_SERVICE_URL', 'http://localhost:3005');
     const internalKey = this.config.get<string>('INTERNAL_API_KEY');
     if (!internalKey) {
       throw new ServiceUnavailableException('INTERNAL_API_KEY no está configurada en Auth Service.');
@@ -60,9 +53,8 @@ export class WhatsappOtpClientService {
 
     const payload: any = await response.json().catch(() => ({}));
     if (!response.ok) {
-      const message = typeof payload?.message === 'string'
-        ? payload.message
-        : 'El servicio de notificaciones rechazó la solicitud.';
+      const message =
+        typeof payload?.message === 'string' ? payload.message : 'El servicio de notificaciones rechazó la solicitud.';
       if (response.status >= 400 && response.status < 500) {
         throw new BadRequestException(message);
       }

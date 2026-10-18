@@ -16,9 +16,7 @@ export class KycClientService {
     const baseUrl = this.config.get<string>('KYC_SERVICE_URL', 'http://localhost:3003');
     const key = this.config.get<string>('INTERNAL_API_KEY');
     if (!key) {
-      throw new ServiceUnavailableException(
-        'INTERNAL_API_KEY no está configurada en Auth Service.',
-      );
+      throw new ServiceUnavailableException('INTERNAL_API_KEY no está configurada en Auth Service.');
     }
 
     try {
@@ -26,7 +24,7 @@ export class KycClientService {
         headers: { 'x-internal-key': key },
       });
       if (!res.ok) throw new Error(`KYC respondió ${res.status}`);
-      const body = await res.json() as { verified?: boolean; nombreCompleto?: string | null };
+      const body = (await res.json()) as { verified?: boolean; nombreCompleto?: string | null };
       return {
         verified: body.verified === true,
         nombreCompleto: body.nombreCompleto ?? null,

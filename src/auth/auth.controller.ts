@@ -5,8 +5,15 @@ import { RefreshTokenDto } from './dto/refresh-token.dto';
 import { RegisterDto } from './dto/register.dto';
 import { IsEmail, IsIn, IsOptional, IsString, IsUUID, Matches, MaxLength, MinLength } from 'class-validator';
 
-class EmailSendDto { @IsUUID() idUser: string; @IsEmail() email: string; }
-class EmailVerifyDto { @IsUUID() idUser: string; @IsEmail() email: string; @Matches(/^\d{6}$/) code: string; }
+class EmailSendDto {
+  @IsUUID() idUser: string;
+  @IsEmail() email: string;
+}
+class EmailVerifyDto {
+  @IsUUID() idUser: string;
+  @IsEmail() email: string;
+  @Matches(/^\d{6}$/) code: string;
+}
 class WhatsappOtpSendDto {
   @IsUUID() idUser: string;
   @Matches(/^\+[1-9]\d{7,14}$/, { message: 'phone debe estar en formato internacional E.164' })
@@ -20,7 +27,10 @@ class WhatsappOtpVerifyDto {
   code: string;
 }
 // Cada endpoint (/email/check, /phone/check) envía solo uno de los dos campos.
-class ContactCheckDto { @IsOptional() @IsString() email?: string; @IsOptional() @IsString() phone?: string; }
+class ContactCheckDto {
+  @IsOptional() @IsString() email?: string;
+  @IsOptional() @IsString() phone?: string;
+}
 // La cuenta se identifica con el correo o, por WhatsApp, con el celular verificado.
 class PasswordResetRequestDto {
   @IsOptional() @IsString() @MaxLength(30) username?: string;
@@ -111,13 +121,21 @@ export class AuthController {
   @Post('password-recovery/send')
   @HttpCode(HttpStatus.OK)
   requestPasswordReset(@Body() dto: PasswordResetRequestDto) {
-    return this.authService.requestPasswordReset({ username: dto.username, email: dto.email, phone: dto.phone }, dto.channel);
+    return this.authService.requestPasswordReset(
+      { username: dto.username, email: dto.email, phone: dto.phone },
+      dto.channel,
+    );
   }
 
   @Post('password-recovery/reset')
   @HttpCode(HttpStatus.OK)
   resetPassword(@Body() dto: PasswordResetDto) {
-    return this.authService.resetPassword({ username: dto.username, email: dto.email, phone: dto.phone }, dto.channel, dto.code, dto.password);
+    return this.authService.resetPassword(
+      { username: dto.username, email: dto.email, phone: dto.phone },
+      dto.channel,
+      dto.code,
+      dto.password,
+    );
   }
 
   @Post('refresh-token')
