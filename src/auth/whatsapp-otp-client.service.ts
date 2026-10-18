@@ -1,5 +1,6 @@
-import { BadRequestException, Injectable, ServiceUnavailableException } from '@nestjs/common';
+import { Injectable, ServiceUnavailableException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { callService, HTTP_TIMEOUTS } from '../common/http/internal-http';
 
 interface OtpResponse {
   sent?: boolean;
@@ -29,37 +30,27 @@ export class WhatsappOtpClientService {
     return this.request('/otp/password-reset/verify', { idUser, phone, code });
   }
 
+  // Errores: regla común de common/http/internal-http.ts (un 4xx de notificaciones,
+  // como código incorrecto o vencido, llega al cliente con su estado y su mensaje).
   private async request(path: string, body: Record<string, string>): Promise<OtpResponse> {
     const baseUrl = this.config.get<string>('NOTIFICATION_SERVICE_URL', 'http://localhost:3005');
     const internalKey = this.config.get<string>('INTERNAL_API_KEY');
     if (!internalKey) {
       throw new ServiceUnavailableException('INTERNAL_API_KEY no está configurada en Auth Service.');
     }
-
-    let response: Response;
-    try {
-      response = await fetch(`${baseUrl}${path}`, {
+    return callService<OtpResponse>(
+      `${baseUrl}${path}`,
+      {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-internal-key': internalKey,
-        },
+        headers: { 'Content-Type': 'application/json', 'x-internal-key': internalKey },
         body: JSON.stringify(body),
-        signal: AbortSignal.timeout(15_000),
-      });
-    } catch {
-      throw new ServiceUnavailableException('No se pudo contactar al servicio de notificaciones.');
-    }
-
-    const payload: any = await response.json().catch(() => ({}));
-    if (!response.ok) {
-      const message =
-        typeof payload?.message === 'string' ? payload.message : 'El servicio de notificaciones rechazó la solicitud.';
-      if (response.status >= 400 && response.status < 500) {
-        throw new BadRequestException(message);
-      }
-      throw new ServiceUnavailableException(message);
-    }
-    return payload as OtpResponse;
+        timeoutMs: HTTP_TIMEOUTS.slow,
+      },
+      {
+        service: 'Notification Service',
+        internal: true,
+        unavailable: 'No se pudo contactar al servicio de notificaciones. Inténtalo de nuevo.',
+      },
+    );
   }
 }
