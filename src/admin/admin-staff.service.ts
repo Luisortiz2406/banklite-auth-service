@@ -20,6 +20,10 @@ import { CreateStaffDto, StaffLoginDto, UpdateStaffDto } from './dto/admin.dto';
 import { StaffUser } from './entities/staff-user.entity';
 
 const MAX_FAILED_LOGINS = 5;
+
+// El iat del token va en segundos: se redondea para que un token emitido en el
+// mismo segundo del cierre (el del nuevo ingreso) siga siendo válido.
+const startOfCurrentSecond = () => new Date(Math.floor(Date.now() / 1000) * 1000);
 const LOCK_MS = 15 * 60 * 1000;
 // Hash para comparar cuando el usuario no existe: mismo costo de tiempo que uno real.
 const DUMMY_HASH = bcrypt.hashSync('usuario-inexistente', 12);
@@ -143,6 +147,11 @@ export class AdminStaffService implements OnModuleInit {
     }
     const changes: Record<string, unknown> = {};
     if (dto.role && dto.role !== user.role) changes.role = user.role = dto.role;
+    // Desactivar o cambiar el rol cierra de inmediato sus sesiones abiertas.
+    if (changes.role !== undefined || dto.active === false) {
+      user.sessionsValidAfter = startOfCurrentSecond();
+      changes.sesiones = 'cerradas';
+    }
     if (dto.numeroDocumento) {
       user.documentoHash = staffDocHash(this.staffSecret(), dto.numeroDocumento);
       changes.documento = 'actualizado';
@@ -211,6 +220,23 @@ export class AdminStaffService implements OnModuleInit {
     return { changed: true };
   }
 
+  /**
+   * ¿La sesión de este token sigue vigente? El empleado debe seguir activo, con el
+   * mismo rol del token, y el token no puede ser anterior a sessionsValidAfter.
+   * Lo consulta el gateway antes de dejar pasar cualquier petición del panel.
+   */
+  async checkSession(principal: StaffPrincipal): Promise<void> {
+    const user = await this.staff.findOne({ where: { id: principal.id } });
+    if (!user || !user.active) throw new UnauthorizedException('Tu usuario del panel está desactivado.');
+    if (user.role !== principal.role) {
+      throw new UnauthorizedException('Tu rol cambió: vuelve a ingresar al panel.');
+    }
+    const issuedAtMs = (principal.issuedAt ?? 0) * 1000;
+    if (user.sessionsValidAfter && issuedAtMs < user.sessionsValidAfter.getTime()) {
+      throw new UnauthorizedException('Tu sesión del panel se cerró: vuelve a ingresar.');
+    }
+  }
+
   private staffSecret() {
     const secret = this.config.get<string>('STAFF_JWT_SECRET');
     if (!secret) throw new UnauthorizedException('El panel administrativo no está configurado (STAFF_JWT_SECRET).');
@@ -218,7 +244,7 @@ export class AdminStaffService implements OnModuleInit {
   }
 
   private principal(user: StaffUser): StaffPrincipal {
-    return { id: user.id, username: user.username, role: user.role, docHash: user.documentoHash };
+    return { id: user.id, username: user.username, role: user.role, docHash: user.documentoHash, issuedAt: null };
   }
 
   private publicStaff(u: StaffUser) {

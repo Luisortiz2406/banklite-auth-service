@@ -37,6 +37,14 @@ export class AdminController {
     return this.staff.me(staffOf(req).id);
   }
 
+  /** El gateway lo consulta en cada petición del panel: 401 si la sesión se cerró. */
+  @Get('session')
+  @UseGuards(StaffAuthGuard)
+  async session(@Req() req: any) {
+    await this.staff.checkSession(staffOf(req));
+    return { valid: true };
+  }
+
   /** Cualquier empleado cambia su propia contraseña (exige la actual). */
   @Post('me/password')
   @HttpCode(200)

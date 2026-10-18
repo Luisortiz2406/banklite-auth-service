@@ -11,5 +11,7 @@ ENV NODE_ENV=production
 COPY package*.json ./
 RUN npm install --omit=dev
 COPY --from=build /app/dist ./dist
+# Registro por consola del documento del primer administrador (scripts/admin/)
+COPY scripts/registrar-documento-admin.js ./scripts/registrar-documento-admin.js
 EXPOSE 3001
 CMD ["node", "dist/main"]

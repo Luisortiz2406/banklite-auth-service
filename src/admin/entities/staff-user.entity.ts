@@ -39,6 +39,11 @@ export class StaffUser {
   @Column({ name: 'last_login_at', type: 'timestamptz', nullable: true })
   lastLoginAt: Date | null;
 
+  // Los tokens emitidos antes de esta fecha ya no sirven: se fija al desactivar al
+  // empleado o cambiarle el rol, y el gateway lo consulta en cada petición del panel.
+  @Column({ name: 'sessions_valid_after', type: 'timestamptz', nullable: true })
+  sessionsValidAfter: Date | null;
+
   @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
   createdAt: Date;
 
