@@ -23,6 +23,10 @@ export class StaffUser {
   @Column({ type: 'varchar', default: 'support' })
   role: StaffRole;
 
+  // Huella del documento (staffDocHash), no el número. Null si no se registró.
+  @Column({ name: 'documento_hash', type: 'varchar', length: 64, nullable: true })
+  documentoHash: string | null;
+
   @Column({ default: true })
   active: boolean;
 

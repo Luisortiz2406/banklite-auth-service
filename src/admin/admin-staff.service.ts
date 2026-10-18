@@ -15,6 +15,7 @@ import * as bcrypt from 'bcryptjs';
 import { Repository } from 'typeorm';
 import { AdminAuditService } from '../common/staff/admin-audit.service';
 import { StaffPrincipal } from '../common/staff/staff-auth.guard';
+import { staffDocHash } from '../common/staff/staff-doc-hash';
 import { CreateStaffDto, StaffLoginDto, UpdateStaffDto } from './dto/admin.dto';
 import { StaffUser } from './entities/staff-user.entity';
 
@@ -86,7 +87,14 @@ export class AdminStaffService implements OnModuleInit {
     await this.audit.record(principal, { action: 'staff.login', targetType: 'staff', targetId: user.id });
 
     const accessToken = this.jwt.sign(
-      { sub: user.id, type: 'staff', role: user.role, username: user.username },
+      {
+        sub: user.id,
+        type: 'staff',
+        role: user.role,
+        username: user.username,
+        // kyc-service lo usa para impedir que el empleado apruebe su propia verificación
+        ...(user.documentoHash ? { docHash: user.documentoHash } : {}),
+      },
       { algorithm: 'HS256', secret: this.staffSecret(), expiresIn: this.config.get('STAFF_JWT_EXPIRES_IN', '8h') },
     );
     return { accessToken, staff: this.publicStaff(user) };
@@ -114,6 +122,7 @@ export class AdminStaffService implements OnModuleInit {
           nombre: dto.nombre.trim(),
           passwordHash: await bcrypt.hash(dto.password, 12),
           role: dto.role,
+          documentoHash: dto.numeroDocumento ? staffDocHash(this.staffSecret(), dto.numeroDocumento) : null,
         }),
       );
       await this.audit.record(
@@ -129,11 +138,15 @@ export class AdminStaffService implements OnModuleInit {
   async update(id: string, dto: UpdateStaffDto, actor: StaffPrincipal) {
     const user = await this.staff.findOne({ where: { id } });
     if (!user) throw new NotFoundException('Empleado no encontrado.');
-    if (id === actor.id && (dto.active === false || (dto.role && dto.role !== user.role))) {
-      throw new BadRequestException('No puedes desactivarte ni cambiar tu propio rol.');
+    if (id === actor.id && (dto.active === false || (dto.role && dto.role !== user.role) || dto.numeroDocumento)) {
+      throw new BadRequestException('No puedes desactivarte ni cambiar tu propio rol o documento.');
     }
     const changes: Record<string, unknown> = {};
     if (dto.role && dto.role !== user.role) changes.role = user.role = dto.role;
+    if (dto.numeroDocumento) {
+      user.documentoHash = staffDocHash(this.staffSecret(), dto.numeroDocumento);
+      changes.documento = 'actualizado';
+    }
     if (dto.active !== undefined && dto.active !== user.active) changes.active = user.active = dto.active;
     if (dto.password) {
       user.passwordHash = await bcrypt.hash(dto.password, 12);
@@ -205,7 +218,7 @@ export class AdminStaffService implements OnModuleInit {
   }
 
   private principal(user: StaffUser): StaffPrincipal {
-    return { id: user.id, username: user.username, role: user.role };
+    return { id: user.id, username: user.username, role: user.role, docHash: user.documentoHash };
   }
 
   private publicStaff(u: StaffUser) {
@@ -214,6 +227,7 @@ export class AdminStaffService implements OnModuleInit {
       username: u.username,
       nombre: u.nombre,
       role: u.role,
+      hasDocumento: !!u.documentoHash,
       active: u.active,
       locked: !!u.lockedUntil && u.lockedUntil.getTime() > Date.now(),
       lastLoginAt: u.lastLoginAt,

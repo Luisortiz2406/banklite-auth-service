@@ -1,5 +1,6 @@
 import { Type } from 'class-transformer';
 import { IsBoolean, IsIn, IsInt, IsOptional, IsString, Matches, Max, MaxLength, Min, MinLength } from 'class-validator';
+import { STAFF_ROLES, StaffRole } from '../../common/staff/staff-auth.guard';
 
 export class StaffLoginDto {
   @IsString()
@@ -13,6 +14,8 @@ export class StaffLoginDto {
 
 const PASSWORD_RULE = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{12,}$/;
 const PASSWORD_MESSAGE = 'La contraseña debe tener al menos 12 caracteres, con mayúsculas, minúsculas y números.';
+const DOCUMENT_RULE = /^[0-9A-Za-z][0-9A-Za-z.\- ]{3,18}[0-9A-Za-z]$/;
+const DOCUMENT_MESSAGE = 'El documento debe tener entre 5 y 20 caracteres (números y letras).';
 
 export class CreateStaffDto {
   @Matches(/^[a-z0-9._-]{3,40}$/, {
@@ -28,14 +31,24 @@ export class CreateStaffDto {
   @Matches(PASSWORD_RULE, { message: PASSWORD_MESSAGE })
   password: string;
 
-  @IsIn(['support', 'admin'])
-  role: 'support' | 'admin';
+  @IsIn(STAFF_ROLES)
+  role: StaffRole;
+
+  // Documento de identidad del empleado: con él, kyc-service le impide aprobar su
+  // propia verificación. Solo se guarda su huella (staffDocHash), nunca el número.
+  @IsOptional()
+  @Matches(DOCUMENT_RULE, { message: DOCUMENT_MESSAGE })
+  numeroDocumento?: string;
 }
 
 export class UpdateStaffDto {
   @IsOptional()
-  @IsIn(['support', 'admin'])
-  role?: 'support' | 'admin';
+  @IsIn(STAFF_ROLES)
+  role?: StaffRole;
+
+  @IsOptional()
+  @Matches(DOCUMENT_RULE, { message: DOCUMENT_MESSAGE })
+  numeroDocumento?: string;
 
   @IsOptional()
   @IsBoolean()
