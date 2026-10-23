@@ -1,5 +1,7 @@
 # Auth Service (`auth-service`)
 
+[![CI](https://github.com/Luisortiz2406/banklite-auth-service/actions/workflows/ci.yml/badge.svg)](https://github.com/Luisortiz2406/banklite-auth-service/actions/workflows/ci.yml)
+
 Identidad de acceso de BankLite: registro de credenciales, inicio de sesión, tokens JWT, clave dinámica y empleados del panel administrativo.
 
 Parte de **BankLite**, banco digital académico construido con microservicios. Cada
@@ -202,10 +204,28 @@ npm test
 
 ## Despliegue
 
-Desplegado en Railway (raíz del servicio: esta carpeta, `railway.json` con
-`healthcheckPath: /health`). El servicio no tiene dominio público propio: se accede
+Desplegado en Railway **desde este repositorio** (rama `main`): `railway.json` en la
+raíz define el build por `Dockerfile` y el health check en `/health`; cada push a
+`main` redespliega el servicio. El servicio no tiene dominio público propio: se accede
 por el gateway.
 
-- Estado del servicio y de su base: https://api-gateway-production-dd7f.up.railway.app/health (entrada `auth-service`: `status` y `database` deben estar en `ok`)
+- Estado del servicio y de su base: [https://api-gateway-production-dd7f.up.railway.app/health](https://api-gateway-production-dd7f.up.railway.app/health) (entrada `auth-service`: `status` y `database` deben estar en `ok`)
 - Rutas de este servicio: `https://api-gateway-production-dd7f.up.railway.app/auth/...`
 - Aplicación web: https://frontend-production-eff3c.up.railway.app
+
+## Repositorios relacionados
+
+Servicios de BankLite con los que se comunica este. **Llama a** / **Lo llama**: HTTP
+por la red interna; **Recibe** / **Envía**: eventos en RabbitMQ. Cada uno vive y se
+despliega desde su propio repositorio.
+
+| Repositorio | Relación con este servicio |
+|---|---|
+| [banklite-api-gateway](https://github.com/Luisortiz2406/banklite-api-gateway) | **Lo llama:** punto de entrada público, le enruta las rutas de este servicio |
+| [banklite-kyc-service](https://github.com/Luisortiz2406/banklite-kyc-service) | **Llama a:** estado de identidad y contacto verificado |
+| [banklite-notification-service](https://github.com/Luisortiz2406/banklite-notification-service) | **Llama a:** OTP por WhatsApp y correos<br>**Envía:** `usuario_autenticado`, `intento_fallido_login`, `account.created` |
+| [banklite-compliance-service](https://github.com/Luisortiz2406/banklite-compliance-service) | **Envía:** `account.created` |
+| [banklite-account-service](https://github.com/Luisortiz2406/banklite-account-service) | **Lo llama:** verificación de la clave dinámica (llaves Bre-B) |
+| [banklite-transfer-service](https://github.com/Luisortiz2406/banklite-transfer-service) | **Lo llama:** verificación de la clave dinámica |
+| [banklite-payment-service](https://github.com/Luisortiz2406/banklite-payment-service) | **Lo llama:** verificación de la clave dinámica |
+| [banklite-card-service](https://github.com/Luisortiz2406/banklite-card-service) | **Lo llama:** verificación de la clave dinámica |
