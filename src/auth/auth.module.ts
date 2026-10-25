@@ -11,6 +11,7 @@ import { EmailVerification } from './entities/email-verification.entity';
 import { PhoneVerification } from './entities/phone-verification.entity';
 import { PasswordResetChallenge } from './entities/password-reset-challenge.entity';
 import { EmailService } from './email.service';
+import { FraudClientService } from './fraud-client.service';
 import { KycClientService } from './kyc-client.service';
 import { WhatsappOtpClientService } from './whatsapp-otp-client.service';
 import { PasswordHasher } from './password-hasher.service';
@@ -30,6 +31,7 @@ import { InternalKeyGuard } from '../common/guards/internal-key.guard';
     EventPublisherService,
     EmailService,
     KycClientService,
+    FraudClientService,
     WhatsappOtpClientService,
     PasswordHasher,
     DynamicKeyService,
