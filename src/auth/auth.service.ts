@@ -20,6 +20,7 @@ import { RegisterDto } from './dto/register.dto';
 import { SesionActiva } from './entities/sesion-activa.entity';
 import { UsuarioAuth } from './entities/usuario-auth.entity';
 import { EmailService } from './email.service';
+import { FraudClientService } from './fraud-client.service';
 import { KycClientService } from './kyc-client.service';
 import { PhoneVerification } from './entities/phone-verification.entity';
 import { PasswordResetChallenge } from './entities/password-reset-challenge.entity';
@@ -52,6 +53,7 @@ export class AuthService {
     private readonly emailService: EmailService,
     private readonly kycClient: KycClientService,
     private readonly whatsappOtp: WhatsappOtpClientService,
+    private readonly fraudClient: FraudClientService,
     @InjectRepository(PhoneVerification)
     private readonly phones: Repository<PhoneVerification>,
     @InjectRepository(PasswordResetChallenge)
@@ -440,8 +442,12 @@ export class AuthService {
     return { available: !exists };
   }
 
-  /** POST /auth/login — valida credenciales y entrega el access token directamente. */
-  async login(dto: LoginDto) {
+  /**
+   * POST /auth/login — valida credenciales y entrega el access token directamente.
+   * clientIp: la IP del cliente que pone el gateway (x-client-ip); solo se le
+   * reporta a fraud-service (geolocalización), nunca se guarda ni se registra aquí.
+   */
+  async login(dto: LoginDto, clientIp?: string) {
     if (!dto.email && !dto.username) throw new BadRequestException('Ingresa tu usuario o tu correo.');
     const usuario = dto.username
       ? await this.usuarios.findOne({ where: { username: dto.username.trim().toLowerCase() } })
@@ -493,6 +499,7 @@ export class AuthService {
         );
       });
       void this.events.flush();
+      this.fraudClient.reportLogin({ idUser: usuario.idUser, ip: clientIp, outcome: 'failed' });
 
       throw new UnauthorizedException('Credenciales inválidas');
     }
@@ -547,6 +554,7 @@ export class AuthService {
       );
     });
     void this.events.flush();
+    this.fraudClient.reportLogin({ idUser: usuario.idUser, sessionId: sesion.id, ip: clientIp, outcome: 'success' });
 
     const accessToken = this.issueAccessToken(usuario.idUser);
     return {

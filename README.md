@@ -31,7 +31,7 @@ la red interna). También administra a los empleados del panel (roles `support`,
 |---|---|
 | Publica eventos | `usuario_autenticado`, `intento_fallido_login` → notification<br>`account.created` → notification, compliance |
 | Consume eventos | — |
-| Llama a | kyc-service: estado de identidad y contacto verificado<br>notification-service: OTP por WhatsApp |
+| Llama a | kyc-service: estado de identidad y contacto verificado<br>notification-service: OTP por WhatsApp<br>fraud-service: reporte de cada inicio de sesión con la IP del cliente (`POST /internal/fraud/logins`) |
 | Lo llaman | transfer, payment, account y card: `POST /internal/dynamic-key/verify`<br>api-gateway: sesión del panel<br>api-gateway (rutas `/auth/*`) |
 | Integraciones externas | Gmail API (OAuth) para los códigos por correo |
 
@@ -181,6 +181,7 @@ todas se configuran como variables del servicio, nunca en el código.
 | `INTERNAL_API_KEY` | **Sí** (no arranca sin ella) | — | Clave interna **propia** de este servicio; la manda en `x-internal-key` al llamar a otros. |
 | `INTERNAL_TRUSTED_KEYS` | **Sí** (no arranca sin ella) | `transfer:<clave-de-transfer>` | Claves internas que acepta, `servicio:clave,servicio:clave` (ver `InternalKeyGuard`). |
 | `NOTIFICATION_SERVICE_URL` | Sí | `http://localhost:3005` | URL interna de notification-service. |
+| `FRAUD_SERVICE_URL` | No | `http://localhost:3009` | URL interna de fraud-service. Si está, cada inicio de sesión (exitoso o fallido) se le reporta con la IP del cliente (`x-client-ip` del gateway), sin esperar la respuesta: nunca frena ni rompe el inicio de sesión. La IP no se guarda en auth ni se escribe en los logs. Vacía: no se reporta. |
 | `GMAIL_CLIENT_ID` | Sí | — | OAuth de Gmail API (envío de correos). |
 | `GMAIL_CLIENT_SECRET` | Sí | — | OAuth de Gmail API. |
 | `GMAIL_REFRESH_TOKEN` | Sí | — | Refresh token de la cuenta remitente. |
@@ -223,6 +224,7 @@ despliega desde su propio repositorio.
 |---|---|
 | [banklite-api-gateway](https://github.com/Luisortiz2406/banklite-api-gateway) | **Lo llama:** punto de entrada público, le enruta las rutas de este servicio |
 | [banklite-kyc-service](https://github.com/Luisortiz2406/banklite-kyc-service) | **Llama a:** estado de identidad y contacto verificado |
+| [banklite-fraud-service](https://github.com/Luisortiz2406/banklite-fraud-service) | **Llama a:** reporta cada inicio de sesión con la IP del cliente para la geolocalización (clave interna `auth`) |
 | [banklite-notification-service](https://github.com/Luisortiz2406/banklite-notification-service) | **Llama a:** OTP por WhatsApp y correos<br>**Envía:** `usuario_autenticado`, `intento_fallido_login`, `account.created` |
 | [banklite-compliance-service](https://github.com/Luisortiz2406/banklite-compliance-service) | **Envía:** `account.created` |
 | [banklite-account-service](https://github.com/Luisortiz2406/banklite-account-service) | **Lo llama:** verificación de la clave dinámica (llaves Bre-B) |
