@@ -113,7 +113,7 @@ A través del gateway las rutas son las mismas (`http://localhost:8080/auth/...`
 | Método | Ruta | Descripción |
 |---|---|---|
 | POST | `/auth/admin/login` | Inicio de sesión de un empleado → token del panel. |
-| POST | `/auth/register` | Crea usuario y contraseña del cliente cuya identidad ya verificó KYC. Con `politicaVersion` (por ahora opcional) guarda en la misma transacción la aceptación de la política de privacidad y de los términos; si no es la vigente (`POLITICA_PRIVACIDAD_VIGENTE` en `src/auth/consentimientos.ts`), responde 400 y no crea nada. |
+| POST | `/auth/register` | Crea usuario y contraseña del cliente cuya identidad ya verificó KYC. Exige `politicaVersion` y guarda en la misma transacción la aceptación de la política de privacidad y de los términos. Si falta, tiene otro formato o no es la vigente (`POLITICA_PRIVACIDAD_VIGENTE` en `src/auth/consentimientos.ts`), responde 400 con «La política de privacidad se actualizó. Recarga la página, revísala y acéptala de nuevo.» y no crea nada. |
 | POST | `/auth/username/check` | ¿El nombre de usuario está disponible? |
 | POST | `/auth/email/check` | ¿El correo ya está registrado? |
 | POST | `/auth/email/send` | Envía el código de verificación al correo. |
@@ -204,7 +204,7 @@ del repositorio principal (queda en la auditoría y no sobrescribe uno existente
 npm test   # con TEST_DATABASE_URL=postgres://postgres:postgres@localhost:5432/postgres para las de base
 ```
 
-Con base: el registro guarda la cuenta, la aceptación de la política y el evento juntos o no guarda nada; versión distinta de la vigente → 400; sin `politicaVersion` la cuenta se crea sin aceptación registrada.
+Con base: el registro guarda la cuenta, la aceptación de la política y el evento juntos o no guarda nada; versión distinta de la vigente o ausente → 400 con el mensaje amable, sin crear nada.
 
 ## Despliegue
 

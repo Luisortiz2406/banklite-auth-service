@@ -8,6 +8,14 @@ import { DocumentoLegal } from './entities/consentimiento.entity';
 export const POLITICA_PRIVACIDAD_VIGENTE = '2026-10-25';
 export const TERMINOS_VIGENTES = '2026-10-01';
 
+/**
+ * Lo que ve el cliente si su registro no trae la versión vigente: falta (un
+ * registro.js viejo en una pestaña abierta antes de un despliegue), tiene otro
+ * formato o es una versión anterior. Siempre el mismo mensaje amable.
+ */
+export const POLITICA_DESACTUALIZADA =
+  'La política de privacidad se actualizó. Recarga la página, revísala y acéptala de nuevo.';
+
 /** Filas a guardar cuando el cliente acepta la casilla del registro. */
 export function documentosAceptados(): { documento: DocumentoLegal; version: string }[] {
   return [

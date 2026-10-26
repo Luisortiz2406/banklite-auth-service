@@ -20,7 +20,7 @@ import { RegisterDto } from './dto/register.dto';
 import { SesionActiva } from './entities/sesion-activa.entity';
 import { UsuarioAuth } from './entities/usuario-auth.entity';
 import { EmailService } from './email.service';
-import { documentosAceptados, POLITICA_PRIVACIDAD_VIGENTE } from './consentimientos';
+import { documentosAceptados, POLITICA_DESACTUALIZADA, POLITICA_PRIVACIDAD_VIGENTE } from './consentimientos';
 import { Consentimiento } from './entities/consentimiento.entity';
 import { FraudClientService } from './fraud-client.service';
 import { KycClientService } from './kyc-client.service';
@@ -366,10 +366,8 @@ export class AuthService {
   async register(dto: RegisterDto) {
     // La versión aceptada debe ser la vigente: si la política cambió mientras el
     // cliente llenaba el registro, tiene que leerla y aceptarla de nuevo.
-    if (dto.politicaVersion !== undefined && dto.politicaVersion !== POLITICA_PRIVACIDAD_VIGENTE) {
-      throw new BadRequestException(
-        'La política de privacidad se actualizó. Recarga la página, revísala y acéptala de nuevo.',
-      );
+    if (dto.politicaVersion !== POLITICA_PRIVACIDAD_VIGENTE) {
+      throw new BadRequestException(POLITICA_DESACTUALIZADA);
     }
     const email = this.normalizeEmail(dto.email);
     if (!this.isSecureRegistrationPassword(dto.password)) {
@@ -421,15 +419,13 @@ export class AuthService {
       // (outbox transaccional): o se guarda todo o nada.
       await this.usuarios.manager.transaction(async (manager) => {
         await manager.save(usuario);
-        if (dto.politicaVersion !== undefined) {
-          const aceptadoEn = new Date();
-          await manager.save(
-            Consentimiento,
-            documentosAceptados().map((doc) =>
-              manager.create(Consentimiento, { idUser: usuario.idUser, ...doc, aceptadoEn }),
-            ),
-          );
-        }
+        const aceptadoEn = new Date();
+        await manager.save(
+          Consentimiento,
+          documentosAceptados().map((doc) =>
+            manager.create(Consentimiento, { idUser: usuario.idUser, ...doc, aceptadoEn }),
+          ),
+        );
         await this.events.publish(
           'account.created',
           {
