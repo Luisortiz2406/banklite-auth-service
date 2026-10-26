@@ -52,6 +52,7 @@ rutas internas.
 | Tabla | Contenido |
 |---|---|
 | `usuarios_auth` | Credenciales del cliente (hash de contraseña, estado, intentos). |
+| `consentimientos` | Prueba de la autorización (Ley 1581): documento (`privacidad`, `terminos`), versión aceptada y `aceptado_en` (lo pone el servidor). Sin IP ni datos del navegador. Una fila por documento y versión. |
 | `sesiones_activas` | Tokens de renovación vigentes por sesión. |
 | `email_verifications` | Códigos de verificación de correo. |
 | `phone_verifications` | Verificación del celular por WhatsApp. |
@@ -112,7 +113,7 @@ A través del gateway las rutas son las mismas (`http://localhost:8080/auth/...`
 | Método | Ruta | Descripción |
 |---|---|---|
 | POST | `/auth/admin/login` | Inicio de sesión de un empleado → token del panel. |
-| POST | `/auth/register` | Crea usuario y contraseña del cliente cuya identidad ya verificó KYC. |
+| POST | `/auth/register` | Crea usuario y contraseña del cliente cuya identidad ya verificó KYC. Con `politicaVersion` (por ahora opcional) guarda en la misma transacción la aceptación de la política de privacidad y de los términos; si no es la vigente (`POLITICA_PRIVACIDAD_VIGENTE` en `src/auth/consentimientos.ts`), responde 400 y no crea nada. |
 | POST | `/auth/username/check` | ¿El nombre de usuario está disponible? |
 | POST | `/auth/email/check` | ¿El correo ya está registrado? |
 | POST | `/auth/email/send` | Envía el código de verificación al correo. |
@@ -200,8 +201,10 @@ del repositorio principal (queda en la auditoría y no sobrescribe uno existente
 ## Pruebas
 
 ```bash
-npm test
+npm test   # con TEST_DATABASE_URL=postgres://postgres:postgres@localhost:5432/postgres para las de base
 ```
+
+Con base: el registro guarda la cuenta, la aceptación de la política y el evento juntos o no guarda nada; versión distinta de la vigente → 400; sin `politicaVersion` la cuenta se crea sin aceptación registrada.
 
 ## Despliegue
 
