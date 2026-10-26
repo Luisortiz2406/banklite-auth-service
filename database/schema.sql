@@ -51,6 +51,20 @@ CREATE TABLE public.admin_audit (
 
 
 --
+-- Name: cierre_challenges; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.cierre_challenges (
+    id_user uuid NOT NULL,
+    password_verified_at timestamp with time zone,
+    password_failures integer DEFAULT 0 NOT NULL,
+    otp_failures integer DEFAULT 0 NOT NULL,
+    locked_until timestamp with time zone,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
 -- Name: consentimientos; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -189,7 +203,8 @@ CREATE TABLE public.usuarios_auth (
     disabled_reason character varying(300),
     disabled_at timestamp with time zone,
     created_at timestamp without time zone DEFAULT now() NOT NULL,
-    updated_at timestamp without time zone DEFAULT now() NOT NULL
+    updated_at timestamp without time zone DEFAULT now() NOT NULL,
+    closed_at timestamp with time zone
 );
 
 
@@ -271,6 +286,14 @@ ALTER TABLE ONLY public.usuarios_auth
 
 ALTER TABLE ONLY public.consentimientos
     ADD CONSTRAINT "PK_1b96bdc227c38546461897bb580" PRIMARY KEY (id);
+
+
+--
+-- Name: cierre_challenges PK_19dbbefb278f5d26a47e70b3431; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.cierre_challenges
+    ADD CONSTRAINT "PK_19dbbefb278f5d26a47e70b3431" PRIMARY KEY (id_user);
 
 
 --
