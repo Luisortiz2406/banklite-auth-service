@@ -1,4 +1,5 @@
 import { IsEmail, IsOptional, IsString, IsUUID, Matches, MinLength } from 'class-validator';
+import { POLITICA_DESACTUALIZADA } from '../consentimientos';
 
 /**
  * Endpoint auxiliar para crear credenciales de prueba.
@@ -25,9 +26,9 @@ export class RegisterDto {
   password: string;
 
   // Versión de la política de privacidad que el cliente aceptó en la casilla del
-  // registro (fecha de "Última actualización" de privacidad.html). Opcional mientras
-  // el frontend empieza a enviarla; si llega, debe ser la vigente.
-  @IsOptional()
-  @Matches(/^\d{4}-\d{2}-\d{2}$/, { message: 'politicaVersion debe tener el formato AAAA-MM-DD.' })
-  politicaVersion?: string;
+  // registro (fecha de "Última actualización" de privacidad.html). Obligatoria y debe
+  // ser la vigente; si falta o no sirve, el cliente ve el mensaje amable de recargar.
+  // Sin @IsOptional, @Matches también rechaza el campo ausente (un solo mensaje).
+  @Matches(/^\d{4}-\d{2}-\d{2}$/, { message: POLITICA_DESACTUALIZADA })
+  politicaVersion: string;
 }

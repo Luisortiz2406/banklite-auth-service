@@ -4,7 +4,8 @@ import { DataSource, EntityManager } from 'typeorm';
 import { EventOutbox } from '../events/event-outbox.entity';
 import { createTestDatabase, describeWithDb, truncateAll } from '../testing/test-database';
 import { AuthService } from './auth.service';
-import { POLITICA_PRIVACIDAD_VIGENTE, TERMINOS_VIGENTES } from './consentimientos';
+import { RegisterDto } from './dto/register.dto';
+import { POLITICA_DESACTUALIZADA, POLITICA_PRIVACIDAD_VIGENTE, TERMINOS_VIGENTES } from './consentimientos';
 import { Consentimiento } from './entities/consentimiento.entity';
 import { PasswordResetChallenge } from './entities/password-reset-challenge.entity';
 import { PhoneVerification } from './entities/phone-verification.entity';
@@ -65,13 +66,15 @@ describeWithDb('Registro y aceptación de la política (PostgreSQL)', () => {
     jest.clearAllMocks();
   });
 
-  const dto = (overrides: Record<string, unknown> = {}) => ({
-    idUser: randomUUID(),
-    email: `ana-${randomUUID().slice(0, 8)}@banklite.test`,
-    username: `ana${randomUUID().slice(0, 6)}`,
-    password: '13571357',
-    ...overrides,
-  });
+  // Sin politicaVersion por defecto (como un registro.js viejo); cada prueba la agrega si la necesita.
+  const dto = (overrides: Record<string, unknown> = {}) =>
+    ({
+      idUser: randomUUID(),
+      email: `ana-${randomUUID().slice(0, 8)}@banklite.test`,
+      username: `ana${randomUUID().slice(0, 6)}`,
+      password: '13571357',
+      ...overrides,
+    }) as unknown as RegisterDto;
   const count = (entity: typeof UsuarioAuth | typeof Consentimiento | typeof EventOutbox) =>
     dataSource.getRepository(entity).count();
 
@@ -104,9 +107,9 @@ describeWithDb('Registro y aceptación de la política (PostgreSQL)', () => {
     expect(await count(Consentimiento)).toBe(0);
   });
 
-  it('sin politicaVersion (frontend anterior) la cuenta se crea igual, sin aceptación registrada', async () => {
-    await service.register(dto());
-    expect(await count(UsuarioAuth)).toBe(1);
+  it('sin politicaVersion (registro.js viejo en caché): 400 con el mensaje amable y no se crea nada', async () => {
+    await expect(service.register(dto())).rejects.toThrow(POLITICA_DESACTUALIZADA);
+    expect(await count(UsuarioAuth)).toBe(0);
     expect(await count(Consentimiento)).toBe(0);
   });
 
