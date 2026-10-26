@@ -20,6 +20,8 @@ import { RegisterDto } from './dto/register.dto';
 import { SesionActiva } from './entities/sesion-activa.entity';
 import { UsuarioAuth } from './entities/usuario-auth.entity';
 import { EmailService } from './email.service';
+import { documentosAceptados, POLITICA_PRIVACIDAD_VIGENTE } from './consentimientos';
+import { Consentimiento } from './entities/consentimiento.entity';
 import { FraudClientService } from './fraud-client.service';
 import { KycClientService } from './kyc-client.service';
 import { PhoneVerification } from './entities/phone-verification.entity';
@@ -362,6 +364,13 @@ export class AuthService {
 
   /** Crea las credenciales (clave hasheada con bcrypt). Exige identidad, correo y teléfono verificados. */
   async register(dto: RegisterDto) {
+    // La versión aceptada debe ser la vigente: si la política cambió mientras el
+    // cliente llenaba el registro, tiene que leerla y aceptarla de nuevo.
+    if (dto.politicaVersion !== undefined && dto.politicaVersion !== POLITICA_PRIVACIDAD_VIGENTE) {
+      throw new BadRequestException(
+        'La política de privacidad se actualizó. Recarga la página, revísala y acéptala de nuevo.',
+      );
+    }
     const email = this.normalizeEmail(dto.email);
     if (!this.isSecureRegistrationPassword(dto.password)) {
       throw new BadRequestException('Esta clave es insegura');
@@ -408,9 +417,19 @@ export class AuthService {
       blockedUntil: null,
     });
     try {
-      // Credenciales y evento en la misma transacción (outbox transaccional).
+      // Credenciales, aceptación de la política y evento en la misma transacción
+      // (outbox transaccional): o se guarda todo o nada.
       await this.usuarios.manager.transaction(async (manager) => {
         await manager.save(usuario);
+        if (dto.politicaVersion !== undefined) {
+          const aceptadoEn = new Date();
+          await manager.save(
+            Consentimiento,
+            documentosAceptados().map((doc) =>
+              manager.create(Consentimiento, { idUser: usuario.idUser, ...doc, aceptadoEn }),
+            ),
+          );
+        }
         await this.events.publish(
           'account.created',
           {

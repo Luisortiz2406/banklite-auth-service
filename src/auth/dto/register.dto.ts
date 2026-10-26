@@ -23,4 +23,11 @@ export class RegisterDto {
   @IsString()
   @MinLength(8)
   password: string;
+
+  // Versión de la política de privacidad que el cliente aceptó en la casilla del
+  // registro (fecha de "Última actualización" de privacidad.html). Opcional mientras
+  // el frontend empieza a enviarla; si llega, debe ser la vigente.
+  @IsOptional()
+  @Matches(/^\d{4}-\d{2}-\d{2}$/, { message: 'politicaVersion debe tener el formato AAAA-MM-DD.' })
+  politicaVersion?: string;
 }

@@ -12,6 +12,7 @@ import { PhoneVerification } from './entities/phone-verification.entity';
 import { PasswordResetChallenge } from './entities/password-reset-challenge.entity';
 import { EmailService } from './email.service';
 import { FraudClientService } from './fraud-client.service';
+import { Consentimiento } from './entities/consentimiento.entity';
 import { KycClientService } from './kyc-client.service';
 import { WhatsappOtpClientService } from './whatsapp-otp-client.service';
 import { PasswordHasher } from './password-hasher.service';
@@ -22,7 +23,14 @@ import { InternalKeyGuard } from '../common/guards/internal-key.guard';
 @Module({
   imports: [
     ConfigModule,
-    TypeOrmModule.forFeature([UsuarioAuth, SesionActiva, EmailVerification, PhoneVerification, PasswordResetChallenge]),
+    TypeOrmModule.forFeature([
+      UsuarioAuth,
+      SesionActiva,
+      EmailVerification,
+      PhoneVerification,
+      PasswordResetChallenge,
+      Consentimiento,
+    ]),
     JwtModule.register({}), // secreto/expiración se pasan por llamada (login/refresh)
   ],
   controllers: [AuthController, DynamicKeyController],

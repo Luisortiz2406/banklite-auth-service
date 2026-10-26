@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { Consentimiento } from './auth/entities/consentimiento.entity';
 import { AuthModule } from './auth/auth.module';
 import { SesionActiva } from './auth/entities/sesion-activa.entity';
 import { UsuarioAuth } from './auth/entities/usuario-auth.entity';
@@ -44,6 +45,7 @@ import { validateEnv } from './config/env.validation';
           EmailVerification,
           PhoneVerification,
           PasswordResetChallenge,
+          Consentimiento,
           EventOutbox,
           StaffUser,
           AdminAudit,

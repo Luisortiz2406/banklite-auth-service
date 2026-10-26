@@ -51,6 +51,19 @@ CREATE TABLE public.admin_audit (
 
 
 --
+-- Name: consentimientos; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.consentimientos (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    id_user uuid NOT NULL,
+    documento character varying(20) NOT NULL,
+    version character varying(20) NOT NULL,
+    aceptado_en timestamp with time zone NOT NULL
+);
+
+
+--
 -- Name: email_verifications; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -253,6 +266,14 @@ ALTER TABLE ONLY public.usuarios_auth
 
 
 --
+-- Name: consentimientos PK_1b96bdc227c38546461897bb580; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.consentimientos
+    ADD CONSTRAINT "PK_1b96bdc227c38546461897bb580" PRIMARY KEY (id);
+
+
+--
 -- Name: IDX_25c7fc1787664a823be035ab11; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -341,6 +362,13 @@ CREATE INDEX idx_admin_audit_created ON public.admin_audit USING btree (created_
 --
 
 CREATE INDEX idx_event_outbox_pending ON public.event_outbox USING btree (published_at, created_at);
+
+
+--
+-- Name: uq_consentimientos_usuario_documento_version; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX uq_consentimientos_usuario_documento_version ON public.consentimientos USING btree (id_user, documento, version);
 
 
 --
