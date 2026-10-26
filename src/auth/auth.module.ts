@@ -12,6 +12,8 @@ import { PhoneVerification } from './entities/phone-verification.entity';
 import { PasswordResetChallenge } from './entities/password-reset-challenge.entity';
 import { EmailService } from './email.service';
 import { FraudClientService } from './fraud-client.service';
+import { ConsentimientosController } from './consentimientos.controller';
+import { ConsentimientosService } from './consentimientos.service';
 import { Consentimiento } from './entities/consentimiento.entity';
 import { KycClientService } from './kyc-client.service';
 import { WhatsappOtpClientService } from './whatsapp-otp-client.service';
@@ -33,7 +35,7 @@ import { InternalKeyGuard } from '../common/guards/internal-key.guard';
     ]),
     JwtModule.register({}), // secreto/expiración se pasan por llamada (login/refresh)
   ],
-  controllers: [AuthController, DynamicKeyController],
+  controllers: [AuthController, DynamicKeyController, ConsentimientosController],
   providers: [
     AuthService,
     EventPublisherService,
@@ -44,7 +46,8 @@ import { InternalKeyGuard } from '../common/guards/internal-key.guard';
     PasswordHasher,
     DynamicKeyService,
     InternalKeyGuard,
+    ConsentimientosService,
   ],
-  exports: [EventPublisherService],
+  exports: [EventPublisherService, ConsentimientosService],
 })
 export class AuthModule {}

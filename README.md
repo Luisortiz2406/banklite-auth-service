@@ -47,6 +47,10 @@ rutas internas.
 - JWT (`@nestjs/jwt`) y `class-validator` para validar todo lo que entra
 - Docker (imagen `node:20-alpine`) y despliegue en Railway
 
+**Autorización de datos (marca `cons`)**
+
+El token de acceso del cliente lleva `cons: true` solo si aceptó las versiones vigentes de la política de privacidad y los términos. Se calcula al iniciar sesión, al renovar el token y al aceptar, así que si cambia la versión se vuelve a pedir. El api-gateway no deja operar a un cliente sin esa marca; los empleados (`type: staff`) no se ven afectados. Nunca se rellenan aceptaciones automáticamente: cada cliente acepta él mismo, en el registro o en el modal después de iniciar sesión.
+
 ## Base de datos (`auth_db`)
 
 | Tabla | Contenido |
@@ -114,6 +118,8 @@ A través del gateway las rutas son las mismas (`http://localhost:8080/auth/...`
 |---|---|---|
 | POST | `/auth/admin/login` | Inicio de sesión de un empleado → token del panel. |
 | POST | `/auth/register` | Crea usuario y contraseña del cliente cuya identidad ya verificó KYC. Exige `politicaVersion` y guarda en la misma transacción la aceptación de la política de privacidad y de los términos. Si falta, tiene otro formato o no es la vigente (`POLITICA_PRIVACIDAD_VIGENTE` en `src/auth/consentimientos.ts`), responde 400 con «La política de privacidad se actualizó. Recarga la página, revísala y acéptala de nuevo.» y no crea nada. |
+| GET | `/auth/consentimientos/estado` | Con el token del cliente: si aceptó las versiones vigentes de la política de privacidad y los términos (`vigente`), cuáles y cuándo. |
+| POST | `/auth/consentimientos` | `{politicaVersion}` con el token del cliente: guarda la aceptación (fecha del servidor, sin IP; idempotente) y devuelve un token de acceso nuevo con `cons: true`. Si la aceptación es nueva, recién ahí se reporta la sesión a fraud-service. Versión no vigente → 400 con el mensaje amable. |
 | POST | `/auth/username/check` | ¿El nombre de usuario está disponible? |
 | POST | `/auth/email/check` | ¿El correo ya está registrado? |
 | POST | `/auth/email/send` | Envía el código de verificación al correo. |
@@ -146,6 +152,7 @@ A través del gateway las rutas son las mismas (`http://localhost:8080/auth/...`
 | PATCH | `/auth/admin/staff/:id` | admin | Cambia rol o estado de un empleado (cierra sus sesiones). |
 | GET | `/auth/admin/customers` | cualquier empleado | Busca clientes. |
 | GET | `/auth/admin/customers/:idUser` | cualquier empleado | Ficha de acceso de un cliente. |
+| GET | `/auth/admin/customers/:idUser/consentimientos` | compliance, admin | Autorización de datos del cliente: versión vigente aceptada (o ninguna: cuenta anterior) e historial. Queda en la auditoría. |
 | POST | `/auth/admin/customers/:idUser/disable` | admin | Bloquea el acceso de un cliente. |
 | POST | `/auth/admin/customers/:idUser/enable` | admin | Reactiva el acceso de un cliente. |
 | GET | `/auth/admin/audit` | cualquier empleado | Bitácora de acciones del panel en este servicio (quién, rol, qué y cuándo). |
@@ -182,7 +189,7 @@ todas se configuran como variables del servicio, nunca en el código.
 | `INTERNAL_API_KEY` | **Sí** (no arranca sin ella) | — | Clave interna **propia** de este servicio; la manda en `x-internal-key` al llamar a otros. |
 | `INTERNAL_TRUSTED_KEYS` | **Sí** (no arranca sin ella) | `transfer:<clave-de-transfer>` | Claves internas que acepta, `servicio:clave,servicio:clave` (ver `InternalKeyGuard`). |
 | `NOTIFICATION_SERVICE_URL` | Sí | `http://localhost:3005` | URL interna de notification-service. |
-| `FRAUD_SERVICE_URL` | No | `http://localhost:3009` | URL interna de fraud-service. Si está, cada inicio de sesión (exitoso o fallido) se le reporta con la IP del cliente (`x-client-ip` del gateway), sin esperar la respuesta: nunca frena ni rompe el inicio de sesión. La IP no se guarda en auth ni se escribe en los logs. Vacía: no se reporta. |
+| `FRAUD_SERVICE_URL` | No | `http://localhost:3009` | URL interna de fraud-service. Si está, cada inicio de sesión (exitoso o fallido) **de un cliente con la autorización vigente** se le reporta con la IP del cliente (sin autorización la IP no se procesa; la sesión se reporta al aceptar) (`x-client-ip` del gateway), sin esperar la respuesta: nunca frena ni rompe el inicio de sesión. La IP no se guarda en auth ni se escribe en los logs. Vacía: no se reporta. |
 | `GMAIL_CLIENT_ID` | Sí | — | OAuth de Gmail API (envío de correos). |
 | `GMAIL_CLIENT_SECRET` | Sí | — | OAuth de Gmail API. |
 | `GMAIL_REFRESH_TOKEN` | Sí | — | Refresh token de la cuenta remitente. |
