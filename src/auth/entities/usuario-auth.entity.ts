@@ -78,6 +78,11 @@ export class UsuarioAuth {
   @Column({ name: 'disabled_at', type: 'timestamptz', nullable: true })
   disabledAt: Date | null;
 
+  // Cuenta cancelada por el propio cliente ("Cancelar mi cuenta"). No se borra:
+  // no puede iniciar sesión ni renovar el token. La fila se conserva por obligación legal.
+  @Column({ name: 'closed_at', type: 'timestamptz', nullable: true })
+  closedAt: Date | null;
+
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
 

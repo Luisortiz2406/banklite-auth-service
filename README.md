@@ -55,7 +55,8 @@ El token de acceso del cliente lleva `cons: true` solo si aceptó las versiones 
 
 | Tabla | Contenido |
 |---|---|
-| `usuarios_auth` | Credenciales del cliente (hash de contraseña, estado, intentos). |
+| `usuarios_auth` | Credenciales del cliente (hash de contraseña, estado, intentos). `closed_at`: fecha en que el cliente canceló su cuenta; la fila no se borra (conservación 10 años, referencial: Código de Comercio). |
+| `cierre_challenges` | Cancelación en curso: cuándo dio la clave (vale 10 min para el código), intentos fallidos de clave y de código y bloqueo de 15 min tras 5. |
 | `consentimientos` | Prueba de la autorización (Ley 1581): documento (`privacidad`, `terminos`), versión aceptada y `aceptado_en` (lo pone el servidor). Sin IP ni datos del navegador. Una fila por documento y versión. |
 | `sesiones_activas` | Tokens de renovación vigentes por sesión. |
 | `email_verifications` | Códigos de verificación de correo. |
@@ -139,6 +140,8 @@ A través del gateway las rutas son las mismas (`http://localhost:8080/auth/...`
 | Método | Ruta | Descripción |
 |---|---|---|
 | GET | `/auth/dynamic-key` | Clave dinámica vigente del usuario de la sesión. |
+| POST | `/auth/cierre/iniciar` | Cancelar la cuenta, paso 1: `{password}`. Con la clave correcta envía un código por WhatsApp al celular verificado y devuelve el celular enmascarado. Clave incorrecta → 401; 5 seguidas → 429 por 15 min. |
+| POST | `/auth/cierre/confirmar` | Paso 2: `{codigo}` (dentro de los 10 min siguientes a la clave). Devuelve el **ticket de cierre** (`expiraEnSegundos: 300`), que el frontend entrega a account-service con la palabra «CANCELAR». Un ticket por clave + código; 5 códigos errados → 429. |
 
 ### Panel administrativo (`Authorization: Bearer <token de empleado>`; el gateway además valida la sesión)
 
@@ -163,6 +166,9 @@ A través del gateway las rutas son las mismas (`http://localhost:8080/auth/...`
 | Método | Ruta | Descripción |
 |---|---|---|
 | POST | `/internal/dynamic-key/verify` | Valida la clave dinámica de un usuario (la llaman los servicios que mueven dinero). |
+| POST | `/internal/auth/cierre-acceso` | Solo account-service (clave `account`), ya cerrada la cuenta: `{idUser, cerradaEn?}` marca `closed_at`, revoca **todas** las sesiones y bloquea el inicio de sesión («Tu cuenta fue cancelada el …») y la renovación del token. Idempotente: account-service la reintenta hasta que responda. |
+
+**Ticket de cierre.** JWT HS256 firmado con `CLOSURE_TICKET_SECRET` (no con `JWT_SECRET`), `type: closure_ticket`, `aud: account-service`, `jti` único y 5 minutos de vida. Un token de acceso nunca sirve como ticket ni un ticket como token de acceso (otro secreto y otro tipo; lo prueba `cierre-ticket.spec.ts`). account-service lo verifica y guarda el `jti` para que sea de un solo uso.
 
 ## Variables de entorno
 
@@ -181,6 +187,7 @@ todas se configuran como variables del servicio, nunca en el código.
 | `STAFF_JWT_SECRET` | **Sí** (no arranca sin ella) | — | Firma de los JWT de empleados del panel (el mismo que en auth-service; distinto de JWT_SECRET). |
 | `DYNAMIC_KEY_SECRET` | **Sí** (no arranca sin ella) | — | Semilla HMAC de la clave dinámica de 6 dígitos. |
 | `PASSWORD_PEPPER` | **Sí** (no arranca sin ella) | — | Pimienta que se suma a las contraseñas antes de bcrypt. |
+| `CLOSURE_TICKET_SECRET` | Para cancelar cuentas | — | Firma del ticket de cierre (`openssl rand -hex 32`). Distinto de los demás secretos; si está, debe tener 32+ caracteres sin espacios ni comillas o el servicio no arranca. El mismo valor en account-service (`${{auth-service.CLOSURE_TICKET_SECRET}}` en Railway). Vacía: «Cancelar mi cuenta» responde 503. |
 | `JWT_ACCESS_EXPIRES_IN` | No | `15m` | Duración del token de acceso del cliente. |
 | `JWT_REFRESH_EXPIRES_IN` | No | `7d` | Duración del token de renovación. |
 | `RABBITMQ_URL` | No | `amqp://banklite:<RABBITMQ_PASSWORD>@localhost:5672` | Conexión a RabbitMQ. Sin ella los eventos quedan en el outbox (o no se consumen). |
@@ -237,7 +244,7 @@ despliega desde su propio repositorio.
 | [banklite-fraud-service](https://github.com/Luisortiz2406/banklite-fraud-service) | **Llama a:** reporta cada inicio de sesión con la IP del cliente para la geolocalización (clave interna `auth`) |
 | [banklite-notification-service](https://github.com/Luisortiz2406/banklite-notification-service) | **Llama a:** OTP por WhatsApp y correos<br>**Envía:** `usuario_autenticado`, `intento_fallido_login`, `account.created` |
 | [banklite-compliance-service](https://github.com/Luisortiz2406/banklite-compliance-service) | **Envía:** `account.created` |
-| [banklite-account-service](https://github.com/Luisortiz2406/banklite-account-service) | **Lo llama:** verificación de la clave dinámica (llaves Bre-B) |
+| [banklite-account-service](https://github.com/Luisortiz2406/banklite-account-service) | **Lo llama:** verificación de la clave dinámica (llaves Bre-B); cierre del acceso al cancelar la cuenta (`POST /internal/auth/cierre-acceso`)<br>**Comparten:** `CLOSURE_TICKET_SECRET` (auth firma el ticket de cierre, account lo verifica) |
 | [banklite-transfer-service](https://github.com/Luisortiz2406/banklite-transfer-service) | **Lo llama:** verificación de la clave dinámica |
 | [banklite-payment-service](https://github.com/Luisortiz2406/banklite-payment-service) | **Lo llama:** verificación de la clave dinámica |
 | [banklite-card-service](https://github.com/Luisortiz2406/banklite-card-service) | **Lo llama:** verificación de la clave dinámica |

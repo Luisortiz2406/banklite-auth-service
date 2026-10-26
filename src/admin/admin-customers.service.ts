@@ -104,7 +104,8 @@ export class AdminCustomersService {
     return {
       idUser: u.idUser,
       email: u.email,
-      access: u.disabledByBank ? 'disabled' : locked ? 'locked' : 'active',
+      access: u.closedAt ? 'closed' : u.disabledByBank ? 'disabled' : locked ? 'locked' : 'active',
+      closedAt: u.closedAt,
       failedLoginAttempts: u.failedLoginAttempts,
       lockedUntil: locked ? u.blockedUntil : null,
       disabledReason: u.disabledReason,

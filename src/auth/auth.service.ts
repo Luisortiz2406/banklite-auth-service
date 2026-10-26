@@ -524,6 +524,12 @@ export class AuthService {
       throw new UnauthorizedException('Credenciales inválidas');
     }
 
+    // Cuenta cancelada por el cliente: también solo con la contraseña correcta.
+    if (usuario.closedAt) {
+      const fecha = usuario.closedAt.toLocaleDateString('es-CO', { timeZone: 'America/Bogota', dateStyle: 'long' });
+      throw new ForbiddenException(`Tu cuenta fue cancelada el ${fecha}. Si necesitas ayuda, escríbenos.`);
+    }
+
     // Suspensión manual del banco: se informa solo con la contraseña correcta,
     // para no revelar a terceros el estado de una cuenta.
     if (usuario.disabledByBank) {
@@ -620,7 +626,7 @@ export class AuthService {
     }
 
     const usuario = await this.usuarios.findOne({ where: { idUser: payload.sub } });
-    if (!usuario || usuario.disabledByBank) {
+    if (!usuario || usuario.disabledByBank || usuario.closedAt) {
       throw new UnauthorizedException('El acceso de esta cuenta está suspendido.');
     }
 

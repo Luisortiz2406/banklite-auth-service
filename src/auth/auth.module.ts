@@ -12,7 +12,10 @@ import { PhoneVerification } from './entities/phone-verification.entity';
 import { PasswordResetChallenge } from './entities/password-reset-challenge.entity';
 import { EmailService } from './email.service';
 import { FraudClientService } from './fraud-client.service';
+import { CierreController, InternalCierreController } from './cierre.controller';
+import { CierreService } from './cierre.service';
 import { ConsentimientosController } from './consentimientos.controller';
+import { CierreChallenge } from './entities/cierre-challenge.entity';
 import { ConsentimientosService } from './consentimientos.service';
 import { Consentimiento } from './entities/consentimiento.entity';
 import { KycClientService } from './kyc-client.service';
@@ -32,10 +35,17 @@ import { InternalKeyGuard } from '../common/guards/internal-key.guard';
       PhoneVerification,
       PasswordResetChallenge,
       Consentimiento,
+      CierreChallenge,
     ]),
     JwtModule.register({}), // secreto/expiración se pasan por llamada (login/refresh)
   ],
-  controllers: [AuthController, DynamicKeyController, ConsentimientosController],
+  controllers: [
+    AuthController,
+    DynamicKeyController,
+    ConsentimientosController,
+    CierreController,
+    InternalCierreController,
+  ],
   providers: [
     AuthService,
     EventPublisherService,
@@ -47,6 +57,7 @@ import { InternalKeyGuard } from '../common/guards/internal-key.guard';
     DynamicKeyService,
     InternalKeyGuard,
     ConsentimientosService,
+    CierreService,
   ],
   exports: [EventPublisherService, ConsentimientosService],
 })
