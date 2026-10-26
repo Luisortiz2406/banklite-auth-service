@@ -6,6 +6,7 @@ import { createTestDatabase, describeWithDb, truncateAll } from '../testing/test
 import { AuthService } from './auth.service';
 import { RegisterDto } from './dto/register.dto';
 import { POLITICA_DESACTUALIZADA, POLITICA_PRIVACIDAD_VIGENTE, TERMINOS_VIGENTES } from './consentimientos';
+import { ConsentimientosService } from './consentimientos.service';
 import { Consentimiento } from './entities/consentimiento.entity';
 import { PasswordResetChallenge } from './entities/password-reset-challenge.entity';
 import { PhoneVerification } from './entities/phone-verification.entity';
@@ -55,6 +56,7 @@ describeWithDb('Registro y aceptación de la política (PostgreSQL)', () => {
       { reportLogin: jest.fn() } as never,
       { findOne: async () => ({ verified: true }) } as never, // teléfono verificado
       dataSource.getRepository(PasswordResetChallenge),
+      new ConsentimientosService(dataSource.getRepository(Consentimiento)),
     );
   });
 

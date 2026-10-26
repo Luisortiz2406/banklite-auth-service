@@ -21,6 +21,7 @@ import { SesionActiva } from './entities/sesion-activa.entity';
 import { UsuarioAuth } from './entities/usuario-auth.entity';
 import { EmailService } from './email.service';
 import { documentosAceptados, POLITICA_DESACTUALIZADA, POLITICA_PRIVACIDAD_VIGENTE } from './consentimientos';
+import { ConsentimientosService } from './consentimientos.service';
 import { Consentimiento } from './entities/consentimiento.entity';
 import { FraudClientService } from './fraud-client.service';
 import { KycClientService } from './kyc-client.service';
@@ -60,6 +61,7 @@ export class AuthService {
     private readonly phones: Repository<PhoneVerification>,
     @InjectRepository(PasswordResetChallenge)
     private readonly passwordResetChallenges: Repository<PasswordResetChallenge>,
+    private readonly consentimientos: ConsentimientosService,
   ) {}
 
   private normalizeEmail(email: string): string {
@@ -514,7 +516,10 @@ export class AuthService {
         );
       });
       void this.events.flush();
-      this.fraudClient.reportLogin({ idUser: usuario.idUser, ip: clientIp, outcome: 'failed' });
+      // La IP solo se le reporta a fraud si el cliente tiene la autorización vigente.
+      if (await this.consentimientos.tieneVigente(usuario.idUser)) {
+        this.fraudClient.reportLogin({ idUser: usuario.idUser, ip: clientIp, outcome: 'failed' });
+      }
 
       throw new UnauthorizedException('Credenciales inválidas');
     }
@@ -569,9 +574,15 @@ export class AuthService {
       );
     });
     void this.events.flush();
-    this.fraudClient.reportLogin({ idUser: usuario.idUser, sessionId: sesion.id, ip: clientIp, outcome: 'success' });
+    // Sin la autorización vigente la IP no se procesa: el reporte a fraud se hace
+    // cuando el cliente acepta (POST /auth/consentimientos) y el token sale sin
+    // "cons", así que el gateway no lo deja operar hasta que acepte.
+    const consentimientoVigente = await this.consentimientos.tieneVigente(usuario.idUser);
+    if (consentimientoVigente) {
+      this.fraudClient.reportLogin({ idUser: usuario.idUser, sessionId: sesion.id, ip: clientIp, outcome: 'success' });
+    }
 
-    const accessToken = this.issueAccessToken(usuario.idUser);
+    const accessToken = this.issueAccessToken(usuario.idUser, consentimientoVigente);
     return {
       sessionId: sesion.id,
       accessToken,
@@ -613,13 +624,19 @@ export class AuthService {
       throw new UnauthorizedException('El acceso de esta cuenta está suspendido.');
     }
 
-    const accessToken = this.issueAccessToken(payload.sub);
+    // Se vuelve a calcular en cada renovación: si cambia la versión de la política, se pide de nuevo.
+    const accessToken = this.issueAccessToken(payload.sub, await this.consentimientos.tieneVigente(payload.sub));
     return { accessToken };
   }
 
-  private issueAccessToken(idUser: string): string {
+  /**
+   * Token de acceso del cliente. cons: true solo si aceptó las versiones vigentes
+   * de la política y los términos; el api-gateway no deja operar sin esa marca
+   * (la firma impide agregarla a mano).
+   */
+  issueAccessToken(idUser: string, consentimientoVigente: boolean): string {
     return this.jwt.sign(
-      { sub: idUser, type: 'access' },
+      consentimientoVigente ? { sub: idUser, type: 'access', cons: true } : { sub: idUser, type: 'access' },
       {
         algorithm: 'HS256',
         secret: this.config.get('JWT_SECRET'),

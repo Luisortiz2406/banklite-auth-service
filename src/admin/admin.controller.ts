@@ -1,6 +1,19 @@
-import { Body, Controller, Get, HttpCode, Param, Patch, Post, Query, Req, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  HttpCode,
+  Param,
+  ParseUUIDPipe,
+  Patch,
+  Post,
+  Query,
+  Req,
+  UseGuards,
+} from '@nestjs/common';
 import { AdminAuditService } from '../common/staff/admin-audit.service';
 import { StaffAuthGuard, StaffPrincipal, StaffRoles } from '../common/staff/staff-auth.guard';
+import { ConsentimientosService } from '../auth/consentimientos.service';
 import { EventPublisherService } from '../events/event-publisher.service';
 import { AdminCustomersService } from './admin-customers.service';
 import { AdminStaffService } from './admin-staff.service';
@@ -23,6 +36,7 @@ export class AdminController {
     private readonly customers: AdminCustomersService,
     private readonly audit: AdminAuditService,
     private readonly events: EventPublisherService,
+    private readonly consentimientos: ConsentimientosService,
   ) {}
 
   @Post('login')
@@ -84,6 +98,25 @@ export class AdminController {
   @UseGuards(StaffAuthGuard)
   customer(@Param('idUser') idUser: string) {
     return this.customers.detail(idUser);
+  }
+
+  /**
+   * Autorización de datos del cliente: qué versión de la política y de los
+   * términos aceptó y cuándo. Solo cumplimiento y administrador; cada consulta
+   * queda en la auditoría.
+   */
+  @Get('customers/:idUser/consentimientos')
+  @UseGuards(StaffAuthGuard)
+  @StaffRoles('compliance', 'admin')
+  async customerConsents(@Param('idUser', ParseUUIDPipe) idUser: string, @Req() req: any) {
+    const result = await this.consentimientos.historial(idUser);
+    await this.audit.record(staffOf(req), {
+      action: 'customer.consents.view',
+      targetType: 'customer',
+      targetId: idUser,
+      details: { vigente: result.vigente },
+    });
+    return result;
   }
 
   @Post('customers/:idUser/disable')
