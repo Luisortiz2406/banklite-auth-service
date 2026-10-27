@@ -20,6 +20,7 @@ import { AdminStaffService } from './admin-staff.service';
 import {
   ChangeOwnPasswordDto,
   CreateStaffDto,
+  CustomersQueryDto,
   PageQueryDto,
   ReasonDto,
   StaffLoginDto,
@@ -90,7 +91,7 @@ export class AdminController {
 
   @Get('customers')
   @UseGuards(StaffAuthGuard)
-  listCustomers(@Query() q: PageQueryDto) {
+  listCustomers(@Query() q: CustomersQueryDto) {
     return this.customers.list(q.q, q.status, q.page ?? 1, q.limit ?? 25);
   }
 

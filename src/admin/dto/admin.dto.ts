@@ -101,3 +101,10 @@ export class PageQueryDto {
   @Max(200)
   limit?: number;
 }
+
+/** Filtro de clientes del panel: activo, bloqueo temporal, suspendido o cancelado (cada cliente cae en uno). */
+export class CustomersQueryDto extends PageQueryDto {
+  @IsOptional()
+  @IsIn(['active', 'locked', 'disabled', 'closed'])
+  status?: 'active' | 'locked' | 'disabled' | 'closed';
+}
