@@ -153,7 +153,7 @@ A través del gateway las rutas son las mismas (`http://localhost:8080/auth/...`
 | GET | `/auth/admin/staff` | admin | Lista de empleados. |
 | POST | `/auth/admin/staff` | admin | Crea un empleado con su rol. |
 | PATCH | `/auth/admin/staff/:id` | admin | Cambia rol o estado de un empleado (cierra sus sesiones). |
-| GET | `/auth/admin/customers` | cualquier empleado | Busca clientes. |
+| GET | `/auth/admin/customers` | cualquier empleado | Busca clientes (`?q=` correo o ID; `?status=` `active`, `locked`, `disabled` o `closed`). Cada cliente cae en un solo estado, el mismo de su `access`: cancelado > suspendido > bloqueo temporal > activo (los que cancelaron solo salen en `closed`). |
 | GET | `/auth/admin/customers/:idUser` | cualquier empleado | Ficha de acceso de un cliente. |
 | GET | `/auth/admin/customers/:idUser/consentimientos` | compliance, admin | Autorización de datos del cliente: versión vigente aceptada (o ninguna: cuenta anterior) e historial. Queda en la auditoría. |
 | POST | `/auth/admin/customers/:idUser/disable` | admin | Bloquea el acceso de un cliente. |

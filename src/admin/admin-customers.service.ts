@@ -28,8 +28,12 @@ export class AdminCustomersService {
         }),
       );
     }
+    // Mismo orden que `access` en publicCustomer (cancelado > suspendido > bloqueo temporal > activo):
+    // cada cliente cae en un solo filtro. Quien canceló su cuenta solo aparece en 'closed'.
+    if (status === 'closed') qb.andWhere('u.closedAt IS NOT NULL');
+    else if (status) qb.andWhere('u.closedAt IS NULL');
     if (status === 'disabled') qb.andWhere('u.disabledByBank = true');
-    if (status === 'locked') qb.andWhere('u.blockedUntil > now()');
+    if (status === 'locked') qb.andWhere('u.disabledByBank = false').andWhere('u.blockedUntil > now()');
     if (status === 'active')
       qb.andWhere('u.disabledByBank = false').andWhere('(u.blockedUntil IS NULL OR u.blockedUntil <= now())');
 
