@@ -220,6 +220,12 @@ npm test   # con TEST_DATABASE_URL=postgres://postgres:postgres@localhost:5432/p
 
 Con base: el registro guarda la cuenta, la aceptación de la política y el evento juntos o no guarda nada; versión distinta de la vigente o ausente → 400 con el mensaje amable, sin crear nada.
 
+**Clave dinámica** (`dynamic-key.service.spec.ts`): el código es el TOTP de 6 dígitos de ese usuario y minuto, comparado con una implementación independiente del RFC 4226/6238; se acepta el del minuto anterior pero no el de dos minutos atrás ni el siguiente; 5 fallos seguidos bloquean 15 minutos, el bloqueo de un usuario no afecta a otro y el servicio no arranca sin `DYNAMIC_KEY_SECRET`.
+
+**Sesión y recuperación** (`auth.service.spec.ts`, con base): 5 claves incorrectas bloquean 30 minutos; una cuenta cancelada o suspendida por el banco no entra (y solo se les dice con la clave correcta); un refresh revocado, vencido o de una cuenta suspendida no renueva; el registro exige correo, teléfono e identidad verificados; la recuperación por correo o WhatsApp se bloquea tras 3 intentos fallidos y cierra las sesiones al cambiar la clave. También se prueban el hash con pepper, los clientes de KYC y notificaciones, el controlador, los guards, `/health` y la validación de configuración.
+
+**Cobertura:** el pipeline la muestra en el resumen de cada corrida y exige un mínimo de 70 % de líneas y 50 % de ramas (`umbral-lineas` y `umbral-ramas` en `deploy.yml`). Hoy está en 74,3 % de líneas y 65,1 % de ramas.
+
 ## Despliegue
 
 Lo despliega **GitHub Actions** (`.github/workflows/deploy.yml`, que usa el workflow
